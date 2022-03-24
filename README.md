@@ -13,11 +13,11 @@ The successful deployment of a Cardano stake pool using this approach can be dec
 Two to three machines are necessary to operate a staking pool. 
 The proposed automated deployment approach requires these machines to have the following requirements:
 
-OS: Ubuntu 20+
-CPU: 2 cores @ 1.8GHz (x86_64 arch)
-RAM: 16GB
-Storage: 30GB (preferably SSD)
-High-speed and stable internet connection
+- OS: Ubuntu 20+
+- CPU: 2 cores @ 1.8GHz (x86_64 arch)
+- RAM: 16GB
+- Storage: 30GB (preferably SSD)
+- High-speed and stable internet connection
 
 Machines can be VMs from a cloud provider or personal servers.
 
