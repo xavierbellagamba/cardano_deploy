@@ -19,8 +19,11 @@ RAM: 16GB
 Storage: 30GB (preferably SSD)
 High-speed and stable internet connection
 
+Machines can be VMs from a cloud provider or personal servers.
+
 ## Disclaimer
 - Security aspects are not covered. Aspiring pool operators should do their own research on the matter and apply state-of-the-art security.
 - The authors do not guarantee the success of the deployment
 - The authors are not responsible for any loss of tokens or cash caused by the deployment and operation of the stake pool
 - This approach only aims at facilitating the deployment of Cardano node, making it more accessible for non-expert users
+
