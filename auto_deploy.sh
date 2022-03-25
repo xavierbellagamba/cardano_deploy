@@ -6,6 +6,12 @@
 # Define run config
 CURRENT_PATH="$PWD"
 
+NODE="CORE" # NODE="RELAY"
+
+PLEDGE=100000000
+COST=340000000
+MARGIN=0.02
+
 CABAL_REPO="https://downloads.haskell.org/~cabal/cabal-install-3.6.2.0/"
 CABAL_INSTALL="cabal-install-"
 CABAL_VERSION="3.6.2.0"
@@ -14,9 +20,26 @@ CABAL_EXT="-x86_64-linux-deb10.tar.xz"
 CARDANO_TAG="1.34.0"
 
 NETWORK_NAME="testnet-magic 1097911063"
-NETWORK_LVL="testnet"
+NETWORK_LVL="testnet" # or "mainnet"
 IP_ADDR="0.0.0.0"
 PORT="3001"
+
+RELAY_IP="0.0.0.0"
+RELAY_PORT="3002"
+
+if [ NODE = "CORE" ]
+then
+  FOLDER="core"
+elif [ NODE = "RELAY" ]
+then
+  FOLDER="relay"
+fi
+
+POOL_NAME="test"
+POOL_TCKR="TTTT"
+POOL_DESCR="test pool on testnet"
+POOL_HOME="SomeAddress"
+POOL_META_URL="someotheraddress.com"
 
 # # Get dependencies
 # sudo apt-get update -y
@@ -102,11 +125,11 @@ PORT="3001"
 # cardano-node --version
 
 # # Create the folder structure and move files
-# mkdir -p ~/relay
+# mkdir -p ~/$FOLDER
 # mkdir -p ~/keysnaddresses
 
 # # Get topology files
-# cd ~/relay
+# cd ~/$FOLDER
 # wget https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/$NETWORK_LVL-config.json
 # wget https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/$NETWORK_LVL-byron-genesis.json
 # wget https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/$NETWORK_LVL-shelley-genesis.json
@@ -114,23 +137,33 @@ PORT="3001"
 # wget https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/$NETWORK_LVL-topology.json
 # cd CURRENT_PATH
 
+# Change to tmux (final run -end of the file to launch the app- with systemd)
+# Remove the non-verbosity
 # Start the node in a background process
 #cardano-node run \
-#  --topology ~/relay/$NETWORK_LVL-topology.json \
-#  --database-path ~/relay/db \
-#  --socket-path ~/relay/db/node.socket \
+#  --topology ~/$FOLDER/$NETWORK_LVL-topology.json \
+#  --database-path ~/$FOLDER/db \
+#  --socket-path ~/$FOLDER/db/node.socket \
 #  --host-addr $IP_ADDR \
 #  --port $PORT \
-#  --config ~/relay/$NETWORK_LVL-config.json &> /dev/null &
+#  --config ~/$FOLDER/$NETWORK_LVL-config.json &> /dev/null &
 #disown
 
 echo "Node started successfully, waiting for the socket to be created"
 #sleep 10
 
 # Make accessible and dave the node socket path in the environment variables
-#echo -e "export CARDANO_NODE_SOCKET_PATH=\"~/relay/db/node.socket\"" >> ~/.bashrc
+#echo -e "export CARDANO_NODE_SOCKET_PATH=\"~/$FOLDER/db/node.socket\"" >> ~/.bashrc
 source ~/.bashrc
-#chmod 777 ~/relay/db/node.socket
+#chmod 777 ~/$FOLDER/db/node.socket
+
+###########################################################
+###########################################################
+# THIS IS WHERE RELAY AND CORE ARE DIFFERENTIATED
+###########################################################
+###########################################################
+#Relay needs to be parametrized via the typology file and then launched.
+#More ops for core node
 
 # Generate keys and addresses
 cardano-cli address key-gen \
@@ -163,7 +196,7 @@ while [ $P < 99.9 ]
 do
   sleep 900
   cardano-cli query tip --$NETWORK_NAME >> curr_tip.json
-  python $PWD/scripts/get_curr_load.py
+  python $CURRENT_PATH/scripts/get_curr_load.py
   P=$( cat curr_load.txt )
   printf "Cardano network loaded at %f%%\n" $P
   rm curr_tip.json
@@ -174,7 +207,7 @@ done
 cardano-cli query utxo \
   --address $(cat ~/keysnaddresses/payment.addr) \
   --testnet-magic 1097911063 >> curr_utxo.txt
-python $PWD/scripts/get_curr_bal.py
+python $CURRENT_PATH/scripts/get_curr_bal.py
 FUND=$( cat curr_bal.txt )
 rm curr_bal.json
 rm curr_utxo.json
@@ -185,7 +218,7 @@ do
   cardano-cli query utxo \
     --address $(cat ~/keysnaddresses/payment.addr) \
     --testnet-magic 1097911063 >> curr_utxo.txt
-  python $PWD/scripts/get_curr_bal.py
+  python $CURRENT_PATH/scripts/get_curr_bal.py
   FUND=$( cat curr_bal.txt )
   rm curr_bal.json
   rm curr_utxo.json
@@ -202,13 +235,13 @@ cardano-cli stake-address registration-certificate \
 cardano-cli query protocol-parameters \
   --$NETWORK_NAME \
   --out-file protocol.json
-python $PWD/scripts/get_staking_deposit.py
+python $CURRENT_PATH/scripts/get_staking_deposit.py
 STK_DPST=$( cat staking_deposit.txt )
 rm staking_deposit.txt
 
 # Get current slot for TTL
 cardano-cli query tip --$NETWORK_NAME >> curr_tip.json
-python $PWD/scripts/get_curr_slot.py
+python $CURRENT_PATH/scripts/get_curr_slot.py
 SLOT=$( cat curr_slot.txt )
 SLOT =$( expr $SLOT + 2000 )
 rm curr_tip.json
@@ -218,9 +251,9 @@ rm curr_slot.txt
 cardano-cli query utxo \
   --address $(cat ~/keysnaddresses/payment.addr) \
   --$NETWORK_NAME >> curr_utxo.txt
-python $PWD/scripts/get_curr_utxo_ix.py
+python $CURRENT_PATH/scripts/get_curr_utxo_ix.py
 UTXOIX=$( cat curr_utxo_ix.txt )
-python $PWD/scripts/get_curr_bal.py
+python $CURRENT_PATH/scripts/get_curr_bal.py
 BAL=$( cat curr_bal.txt )
 rm curr_bal.txt
 rm curr_utxo.txt
@@ -244,7 +277,7 @@ cardano-cli transaction calculate-min-fee \
   --byron-witness-count 0 \
   --$NETWORK_NAME \
   --protocol-params-file protocol.json >> fee_raw.txt
-python $PWD/scripts/get_fee.py
+python $CURRENT_PATH/scripts/get_fee.py
 FEE=$( cat fee.txt )
 rm fee_raw.txt
 rm fee.txt
@@ -279,8 +312,181 @@ rm tx.draft
 
 echo "Staking address and certificate registered"
 
-###########################################################
-###########################################################
-# THIS IS WHERE RELAY AND CORE ARE DIFFERENTIATED
-###########################################################
-###########################################################
+
+if [ $NODE = "RELAY" ]
+then
+  echo "Basic installation for the relay node completed"
+  echo "Please shit down the cardano-node process running in the background using the kill <PID> command"
+  echo "Next, its typology needs to be set up"
+elif [ $NODE = "CORE" ]
+then
+  echo "Starting the core registration"
+
+  # Generate cold keys
+  cd ~/keysnaddresses
+  cardano-cli node key-gen \
+    --cold-verification-key-file cold.vkey \
+    --cold-signing-key-file cold.skey \
+    --operational-certificate-issue-counter-file cold.counter
+
+  # Generate pool verfification key
+  cardano-cli node key-gen-VRF \
+    --verification-key-file vrf.vkey \
+    --signing-key-file vrf.skey
+
+  # Generate KES
+  cardano-cli node key-gen-KES \
+    --verification-key-file kes.vkey \
+    --signing-key-file kes.skey
+
+  # Get the KES period
+  cd ~
+  cp ~/$NODE/$NETWORK_LVL-shelley-genesis.json ~/genesis_tmp.json
+  python $CURRENT_PATH/scripts/get_kes.py
+  KES_P=$( cat kes_period.txt )
+  rm genesis_tmp.json
+  rm kes_period.txt
+
+  # Get current slot
+  cardano-cli query tip --$NETWORK_NAME >> curr_tip.json
+  python $CURRENT_PATH/scripts/get_curr_slot.py
+  SLOT=$( cat curr_slot.txt )
+  rm curr_tip.json
+  rm curr_slot.txt
+
+  # Current kes epoch
+  KES_EP=$( expr $SLOT / $KES_P )
+
+  # Generate operational certificate
+  cd ~/keysnaddresses
+  cardano-cli node issue-op-cert \
+    --kes-verification-key-file kes.vkey \
+    --cold-signing-key-file cold.skey \
+    --operational-certificate-issue-counter cold.counter \
+    --kes-period KES_EP \ 
+    --out-file node.cert
+
+  # Generate pool metadata json
+  cd $CURRENT_PATH
+  if [ -f pool_metadata.json ]
+  then
+    rm pool_metadata.json
+  fi
+  echo -e "{" >> pool_metadata.json
+  echo -e "\t\"name\": \"$POOL_NAME\"," >> pool_metadata.json
+  echo -e "\t\"description\": \"$POOL_DESCR\"," >> pool_metadata.json
+  echo -e "\t\"ticker\": \"$POOL_TCKR\"," >> pool_metadata.json
+  echo -e "\t\"homepage\": \"$POOL_HOME\"" >> pool_metadata.json
+  echo -e "}" >> pool_metadata.json
+
+  # Get the hash of it
+  cardano-cli stake-pool metadata-hash --pool-metadata-file pool_metadata.json >> hash.txt
+  HASH=$( cat hash.txt )
+  rm hash.txt
+
+  # Generate stake pool certificate
+  cd ~/keysnaddresses
+  cardano-cli stake-pool registration-certificate \
+    --cold-verification-key-file cold.vkey \
+    --vrf-verification-key-file vrf.vkey \
+    --pool-pledge $PLEDGE \
+    --pool-cost $COST \
+    --pool-margin $MARGIN \
+    --pool-reward-account-verification-key-file stake.vkey \
+    --pool-owner-stake-verification-key-file stake.vkey \
+    --$NETWORK_NAME \
+    --pool-relay-ipv4 $RELAY_IP \
+    --pool-relay-port $RELAY_PORT \
+    --metadata-url $POOL_META_URL \
+    --metadata-hash $HASH \
+    --out-file pool-registration.cert
+    
+  # Generate the pledge certificate
+  cardano-cli stake-address delegation-certificate \
+    --stake-verification-key-file stake.vkey \
+    --cold-verification-key-file cold.vkey \
+    --out-file delegation.cert
+
+  # Get current balance, utxo and ix
+  cardano-cli query utxo \
+    --address $(cat ~/keysnaddresses/payment.addr) \
+    --$NETWORK_NAME >> curr_utxo.txt
+  python $CURRENT_PATH/scripts/get_curr_utxo_ix.py
+  UTXOIX=$( cat curr_utxo_ix.txt )
+  python $CURRENT_PATH/scripts/get_curr_bal.py
+  BAL=$( cat curr_bal.txt )
+  rm curr_bal.txt
+  rm curr_utxo.txt
+  rm curr_utxo_ix.txt
+
+  # Build the raw transaction
+  cardano-cli transaction build-raw \
+    --tx-in \
+    --tx-out $(cat payment.addr)+0 \
+    --invalid-hereafter 0 \
+    --fee 0 \
+    --out-file tx.draft \
+    --certificate-file pool-registration.cert \
+    --certificate-file delegation.cert
+
+  # Get the pool deposit from protocol.json
+  cardano-cli query protocol-parameters \
+    --$NETWORK_NAME \
+    --out-file protocol.json
+  python $CURRENT_PATH/scripts/get_pool_deposit.py
+  POOL_DPST=$( cat pool_deposit.txt )
+  rm pool_deposit.txt
+
+  # Calculate the fees
+  cardano-cli transaction calculate-min-fee \
+    --tx-body-file tx.draft \
+    --tx-in-count 1 \
+    --tx-out-count 1 \
+    --witness-count 3 \
+    --byron-witness-count 0 \
+    --$NETWORK_NAME \
+    --protocol-params-file protocol.json >> fee_raw.txt
+  python $CURRENT_PATH/scripts/get_fee.py
+  FEE=$( cat fee.txt )
+  rm fee_raw.txt
+  rm fee.txt
+
+  # Calculate final balance and TTL
+  SLOT=$( $SLOT + 3000 )
+  FIN_BAL=$( expr BAL - POOL_DPST -  )
+
+  # Build final transaction
+  cardano-cli transaction build-raw \
+    --tx-in $UTXOIX \
+    --tx-out $(cat payment.addr)+FIN_BAL \
+    --invalid-hereafter $SLOT \
+    --fee $FEE \
+    --out-file tx.raw \
+    --certificate-file pool-registration.cert \
+    --certificate-file delegation.cert
+
+  # Sign transaction
+  cardano-cli transaction sign \
+    --tx-body-file tx.raw \
+    --signing-key-file payment.skey \
+    --signing-key-file stake.skey \
+    --signing-key-file cold.skey \
+    --$NETWORK_NAME \
+    --out-file tx.signed
+
+  # Submit transaction
+  cardano-cli transaction submit \
+    --tx-file tx.signed \
+    --$NETWORK_NAME
+
+  # Wait a few minutes and test existence of the pool
+  echo "The system will wait for 5 minutes before checking the registration of the pool on the network"
+  sleep 300
+  cardano-cli stake-pool id --cold-verification-key-file cold.vkey --output-format "hex"
+
+fi
+
+
+
+
+
