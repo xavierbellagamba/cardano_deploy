@@ -225,7 +225,7 @@ then
 
 
   ############################################################
-  # SETUP RELAY TYPOLOGY
+  # SETUP RELAY TOPOLOGY
   ############################################################
 
   echo "________________________"
@@ -235,6 +235,21 @@ then
 
   tmux kill-session -t vanilla_run
 
+  # Get list from repo
+  cd $CURRENT_PATH
+  wget https://explorer.cardano-mainnet.iohk.io/relays/topology.json
+
+  # Random selection of other relay nodes and add core node to the list (1st item)
+  echo $CORE_IP >> core_ip.txt
+  echo $CORE_PORT >> core_port.txt
+  python $CURRENT_PATH/scripts/create_relay_topology.py
+  cp $CURRENT_PATH/topology_raw.json ~/$FOLDER/$NETWORK_LVL-topology.json
+  rm core_port.txt
+  rm core_ip.txt
+  rm topology_raw.json
+  rm topology.json
+
+
   ############################################################
   # RUN RELAY AS A SERVICE
   ############################################################
@@ -243,6 +258,13 @@ then
   echo
   echo "RUN RELAY AS A SERVICE"
   echo "________________________"
+
+  # Create and parametrize the systemd structure
+
+  # Create the service in systemd
+
+  # Run the service
+  
 
 elif [ $NODE = "CORE" ]
 then
@@ -572,7 +594,7 @@ then
   echo "________________________"
 
   tmux kill-session -t vanilla_run
-  
+
 
   ############################################################
   # RUN RELAY AS A SERVICE
