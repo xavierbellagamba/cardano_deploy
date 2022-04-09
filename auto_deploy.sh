@@ -64,13 +64,16 @@ echo "INSTALL ALL DEPENDENCIES"
 echo "________________________"
 
 # Get dependencies
+echo "Installing updates and base dependencies"
 sudo apt-get update -y
 sudo apt-get upgrade -y
 sudo apt-get dist-upgrade -y
 sudo apt-get autoremove -y
 sudo apt-get install automake build-essential pkg-config libffi-dev libgmp-dev libssl-dev libtinfo-dev libsystemd-dev zlib1g-dev make g++ tmux git jq wget libncursesw5 libtool python autoconf -y
+echo "Updates and base dependencies installed"
 
 # Get and setup Cabal
+echo "Installing Cabal"
 wget $CABAL_REPO$CABAL_INSTALL$CABAL_VERSION$CABAL_EXT
 tar -xf $CABAL_INSTALL$CABAL_VERSION$CABAL_EXT
 rm $CABAL_INSTALL$CABAL_VERSION$CABAL_EXT
@@ -104,12 +107,14 @@ ghcup install ghc 8.10.7
 ghcup install cabal 3.6.2.0
 ghcup set ghc 8.10.7
 ghcup set cabal 3.6.2.0
+echo "Cabal installed"
 
 # Prep the builds
 mkdir -p ~/cardano
 mkdir -p ~/cardano/src
 
 # Get and install libsodium
+echo "Installing libsodium"
 cd ~/cardano/src
 git clone https://github.com/input-output-hk/libsodium
 cd libsodium
@@ -122,6 +127,7 @@ sudo make install
 echo -e "export LD_LIBRARY_PATH=\"/usr/local/lib:$LD_LIBRARY_PATH\"" >> ~/.bashrc
 echo -e "export PKG_CONFIG_PATH=\"/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH\"" >> ~/.bashrc
 source ~/.bashrc
+echo "Libsodium installed"
 
 
 ############################################################
@@ -134,13 +140,16 @@ echo "INSTALL CARDANO"
 echo "________________________"
 
 # Get Cardano repo
+echo "Download the node install binary"
 cd ~/cardano/src
 git clone https://github.com/input-output-hk/cardano-node.git
 cd cardano-node
 git fetch --all --recurse-submodules --tags
 git checkout tags/$CARDANO_TAG
+echo "Node install binary downloaded"
 
 # Install Cardano
+echo "Installing the Cardano node and cli"
 cabal configure --with-compiler=ghc-8.10.7
 
 echo "package cardano-crypto-praos" >>  cabal.project.local
@@ -153,19 +162,22 @@ cp -p "$(./scripts/bin-path.sh cardano-cli)" ~/.local/bin/
 
 cardano-cli --version
 cardano-node --version
+echo "Node and cli installed"
 
 # Create the folder structure and move files
 mkdir -p ~/$FOLDER
 mkdir -p ~/keysnaddresses
 
 # Get topology files
+echo "Getting base typology files"
 cd ~/$FOLDER
 wget https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/$NETWORK_LVL-config.json
 wget https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/$NETWORK_LVL-byron-genesis.json
 wget https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/$NETWORK_LVL-shelley-genesis.json
 wget https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/$NETWORK_LVL-alonzo-genesis.json
 wget https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/$NETWORK_LVL-topology.json
-cd CURRENT_PATH
+cd $CURRENT_PATH
+echo "Base typology files downloaded"
 
 
 ############################################################
@@ -177,10 +189,7 @@ echo
 echo "DOWNLOAD THE BLOCKCHAIN"
 echo "________________________"
 
-# Change to tmux (final run -end of the file to launch the app- with systemd)
-# Remove the non-verbosity
-# Start the node in a background process
-
+# Start the node in a background process with tmux
 NODE_RUN="cardano-node run \
   --topology ~/$FOLDER/$NETWORK_LVL-topology.json \
   --database-path ~/$FOLDER/db \
@@ -222,6 +231,8 @@ then
   done
 
   echo "Basic installation for the relay node completed, shutting down the node vanilla run"
+  tmux kill-session -t vanilla_run
+  echo "Node shut down"
 
 
   ############################################################
@@ -233,13 +244,14 @@ then
   echo "SETUP RELAY TYPOLOGY"
   echo "________________________"
 
-  tmux kill-session -t vanilla_run
-
   # Get list from repo
+  echo "Getting the latest full typology file"
   cd $CURRENT_PATH
   wget https://explorer.cardano-mainnet.iohk.io/relays/topology.json
+  echo "Topology file downloaded"
 
   # Random selection of other relay nodes and add core node to the list (1st item)
+  echo "Set up relay node typology file"
   echo $CORE_IP >> core_ip.txt
   echo $CORE_PORT >> core_port.txt
   python $CURRENT_PATH/scripts/create_relay_topology.py
@@ -248,6 +260,7 @@ then
   rm core_ip.txt
   rm topology_raw.json
   rm topology.json
+  echo "Typology file of the relay node set up"
 
 
   ############################################################
@@ -260,11 +273,53 @@ then
   echo "________________________"
 
   # Create and parametrize the systemd structure
+  mkdir -p /etc/systemd
+  mkdir -p /etc/systemd/system/
 
   # Create the service in systemd
+  if [ -f /etc/systemd/system/cardano_relay.service ]
+  then
+    rm /etc/systemd/system/cardano_relay.service
+  fi
+
+  # Generate cardano_relay_launch script
+  echo "Generate the systemd file"
+  echo "[Unit]" >> /etc/systemd/system/cardano_relay.service
+  echo "Description=Cardano relay node" >> /etc/systemd/system/cardano_relay.service
+  echo "" >> /etc/systemd/system/cardano_relay.service
+  echo "[Service]" >> /etc/systemd/system/cardano_relay.service
+  echo "Type=Simple" >> /etc/systemd/system/cardano_relay.service
+  echo "ExecStart=$NODE_RUN" >> /etc/systemd/system/cardano_relay.service
+  echo "Restart=always" >> /etc/systemd/system/cardano_relay.service
+  echo "RestartSec=1" >> /etc/systemd/system/cardano_relay.service
+  echo "" >> /etc/systemd/system/cardano_relay.service
+  echo "[Install]" >> /etc/systemd/system/cardano_relay.service
+  echo "Alias=cardano_relay" >> /etc/systemd/system/cardano_relay.service
+  echo "" >> /etc/systemd/system/cardano_relay.service
+  echo "Systemd file generated"
 
   # Run the service
-  
+  echo "Launch the node as a service"
+  sudo systemctl start cardano_relay
+
+  # Check if service running
+  systemctl status cardano_relay >> service_status_raw.txt
+  python $CURRENT_PATH/scripts/get_service_status.py
+  SRV_ST=$( cat service_status.txt )
+
+  if [ $SRV_ST = "active" ]
+  then
+    echo "Installation and deployment of the relay node completed."
+    echo "Relay node deployment completed!"
+  else
+    echo "Something failed. Node not running. Investigate"
+  fi
+
+  rm service_status_raw.txt
+  rm service_status.txt
+
+  return 0
+
 
 elif [ $NODE = "CORE" ]
 then
