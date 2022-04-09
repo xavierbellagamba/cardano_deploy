@@ -129,6 +129,9 @@ echo -e "export PKG_CONFIG_PATH=\"/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH\"" >
 source ~/.bashrc
 echo "Libsodium installed"
 
+cd $CURRENT_PATH
+rm hkl.sh
+
 
 ############################################################
 # INSTALL THE CARDANO
