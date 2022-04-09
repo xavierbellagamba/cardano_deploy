@@ -1,7 +1,7 @@
 #!/usr/bin/env bash 
 
 # Execute at user root level
-# Run with the -i flag (interactive)
+# Run with the -i flag (interactive) and within tmux
 
 ############################################################
 # SET THE NODE PARAMETERS
@@ -33,15 +33,15 @@ CARDANO_TAG="1.34.0"
 NETWORK_NAME="mainnet" # "mainnet" or "testnet-magic 1097911063"
 NETWORK_LVL="mainnet" # "mainnet" or "testnet"
 IP_ADDR="0.0.0.0"
-PORT="3001"
+PORT="6000"
 
 # Relay IP (only necessary for the core node)
-RELAY_IP="3.126.55.135"
-RELAY_PORT="3002"
+RELAY_IP="ec2-3-126-55-135.eu-central-1.compute.amazonaws.com"
+RELAY_PORT="6000"
 
 # Core IP
-CORE_IP="3.72.77.139"
-CORE_PORT="3002"
+CORE_IP="ec2-3-72-77-139.eu-central-1.compute.amazonaws.com"
+CORE_PORT="6000"
 
 if [ NODE = "CORE" ]
 then
@@ -197,8 +197,9 @@ NODE_RUN="cardano-node run \
   --host-addr $IP_ADDR \
   --port $PORT \
   --config ~/$FOLDER/$NETWORK_LVL-config.json"
+
 tmux new -d -s vanilla_run
-tmux send-keys "$NODE_RUN" Enter
+tmux send-keys -t vanilla_run "$NODE_RUN" Enter
 
 echo "Node started successfully, waiting for the socket to be created"
 sleep 10
@@ -231,6 +232,7 @@ then
   done
 
   echo "Basic installation for the relay node completed, shutting down the node vanilla run"
+  tmux send-keys -t vanilla_run C-c
   tmux kill-session -t vanilla_run
   echo "Node shut down"
 
