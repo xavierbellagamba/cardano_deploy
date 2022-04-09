@@ -7,8 +7,8 @@
 # SET THE NODE PARAMETERS
 ############################################################
 
-# Node type
-NODE="CORE" # NODE="RELAY"
+# Node type 
+NODE="RELAY" # "CORE" or "RELAY"
 
 # Pool parameters (only for core node)
 PLEDGE=100000000
@@ -30,17 +30,17 @@ CABAL_EXT="-x86_64-linux-deb10.tar.xz"
 CARDANO_TAG="1.34.0"
 
 # Deployment network
-NETWORK_NAME="testnet-magic 1097911063"
-NETWORK_LVL="testnet" # or "mainnet"
+NETWORK_NAME="mainnet" # "mainnet" or "testnet-magic 1097911063"
+NETWORK_LVL="mainnet" # "mainnet" or "testnet"
 IP_ADDR="0.0.0.0"
 PORT="3001"
 
 # Relay IP (only necessary for the core node)
-RELAY_IP="0.0.0.0"
+RELAY_IP="3.126.55.135"
 RELAY_PORT="3002"
 
 # Core IP
-CORE_IP="0.0.0.0"
+CORE_IP="3.72.77.139"
 CORE_PORT="3002"
 
 if [ NODE = "CORE" ]
@@ -264,6 +264,30 @@ then
 
 
   ############################################################
+  # SETUP GLIVEVIEW
+  ############################################################
+  
+  echo "________________________"
+  echo
+  echo "SETUP gLiveView"
+  echo "________________________"
+
+  cd $CURRENT_PATH
+  echo "Download the dependencies and package"
+  sudo apt-get install bc tcptraceroute -y
+  curl -s -o gLiveView.sh https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/gLiveView.sh
+  curl -s -o env https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/env
+  chmod 755 gLiveView.sh
+  echo "Dependencies downloaded and installed"
+
+  echo "Change environment variables for gLiveView"
+  sed -i env \
+    -e "s/\#CONFIG=\"\${CNODE_HOME}\/files\/config.json\"/CONFIG=\"$CURRENT_PATH\/$FOLDER\/$NETWORK_LVL-config.json\"/g" \
+    -e "s/\#SOCKET=\"\${CNODE_HOME}\/sockets\/node0.socket\"/SOCKET=\"$CURRENT_PATH\/$FOLDER\/db\/socket\"/g"
+  echo "Variables updated"
+
+
+  ############################################################
   # RUN RELAY AS A SERVICE
   ############################################################
 
@@ -283,23 +307,45 @@ then
   fi
 
   # Generate cardano_relay_launch script
+  echo "Generate the sh launch script"
+
+  echo "#!/bin/bash" >> $CURRENT_PATH/launch_script.sh
+  echo "$NODE_RUN" >> $CURRENT_PATH/launch_script.sh
+
+  chmod +x ./launch_script.sh
+  echo "Launch script generated"
+
+  # Generate the service file
   echo "Generate the systemd file"
+
   echo "[Unit]" >> /etc/systemd/system/cardano_relay.service
   echo "Description=Cardano relay node" >> /etc/systemd/system/cardano_relay.service
+  echo "Wants=network-online.target" >> /etc/systemd/system/cardano_relay.service
+  echo "After=network-online.target" >> /etc/systemd/system/cardano_relay.service
   echo "" >> /etc/systemd/system/cardano_relay.service
   echo "[Service]" >> /etc/systemd/system/cardano_relay.service
+  echo "User=$USER"
   echo "Type=Simple" >> /etc/systemd/system/cardano_relay.service
-  echo "ExecStart=$NODE_RUN" >> /etc/systemd/system/cardano_relay.service
+  echo "WorkingDirectory= $CURRENT_PATH" >> /etc/systemd/system/cardano_relay.service
+  echo "ExecStart=bash $CURRENT_PATH/launch_script.sh" >> /etc/systemd/system/cardano_relay.service
   echo "Restart=always" >> /etc/systemd/system/cardano_relay.service
-  echo "RestartSec=1" >> /etc/systemd/system/cardano_relay.service
+  echo "RestartSec=5" >> /etc/systemd/system/cardano_relay.service
+  echo "KillSignal=SIGINT" >> /etc/systemd/system/cardano_relay.service
+  echo "RestartKillSignal=SIGINT" >> /etc/systemd/system/cardano_relay.service
+  echo "TimeoutStopSec=300" >> /etc/systemd/system/cardano_relay.service
+  echo "SyslogIdentifier=cardano-node" >> /etc/systemd/system/cardano_relay.service
   echo "" >> /etc/systemd/system/cardano_relay.service
   echo "[Install]" >> /etc/systemd/system/cardano_relay.service
-  echo "Alias=cardano_relay" >> /etc/systemd/system/cardano_relay.service
+  echo "WantedBy	= multi-user.target" >> /etc/systemd/system/cardano_relay.service
   echo "" >> /etc/systemd/system/cardano_relay.service
+
+  sudo chmod 644 /etc/systemd/system/cardano_relay.service
   echo "Systemd file generated"
 
   # Run the service
   echo "Launch the node as a service"
+  sudo systemctl daemon-reload
+  sudo systemctl enable cardano_relay
   sudo systemctl start cardano_relay
 
   # Check if service running
@@ -321,6 +367,9 @@ then
   return 0
 
 
+############################################################
+# CORE NODE SETUP
+############################################################
 elif [ $NODE = "CORE" ]
 then
   ############################################################
@@ -649,6 +698,30 @@ then
   echo "________________________"
 
   tmux kill-session -t vanilla_run
+
+
+  ############################################################
+  # SETUP GLIVEVIEW
+  ############################################################
+  
+  echo "________________________"
+  echo
+  echo "SETUP gLiveView"
+  echo "________________________"
+
+  cd $CURRENT_PATH
+  echo "Download the dependencies and package"
+  sudo apt-get install bc tcptraceroute -y
+  curl -s -o gLiveView.sh https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/gLiveView.sh
+  curl -s -o env https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/env
+  chmod 755 gLiveView.sh
+  echo "Dependencies downloaded and installed"
+
+  echo "Change environment variables for gLiveView"
+  sed -i env \
+    -e "s/\#CONFIG=\"\${CNODE_HOME}\/files\/config.json\"/CONFIG=\"$CURRENT_PATH\/$FOLDER\/$NETWORK_LVL-config.json\"/g" \
+    -e "s/\#SOCKET=\"\${CNODE_HOME}\/sockets\/node0.socket\"/SOCKET=\"$CURRENT_PATH\/$FOLDER\/db\/socket\"/g"
+  echo "Variables updated"
 
 
   ############################################################
