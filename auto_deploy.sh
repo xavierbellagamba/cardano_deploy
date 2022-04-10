@@ -222,7 +222,11 @@ chmod 777 ~/$FOLDER/db/node.socket
 if [[ "$NODE" == "RELAY" ]]
 then
 
-  echo "Blockchain downloading. This could take a while (4-12 hours depending on network amd machine performances)"
+  echo "________________________"
+  echo
+  echo "BLOCKCHAIN DOWNLOADING"
+  echo "________________________"
+  echo "This could take a while (4-12 hours depending on network amd machine performances)"
 
   P=0
   while (( P < 99 ))
@@ -395,11 +399,64 @@ then
 ############################################################
 elif [ $NODE == "CORE" ]
 then
+
+  echo "________________________"
+  echo
+  echo "BLOCKCHAIN DOWNLOADING"
+  echo "________________________"
+  echo "This could take a while (4-12 hours depending on network amd machine performances)"
+  echo "While the blockchain is loading, request funds from the Faucet for testnet or transfer ADA for mainnet"
+
+  P=0
+  while (( P < 99 ))
+  do
+    sleep 900
+    cardano-cli query tip --$NETWORK_NAME >> curr_tip.json
+    python3 $CURRENT_PATH/scripts/get_curr_load.py
+    P=$( cat curr_load.txt )
+    echo "Cardano network loaded at $P%"
+    rm curr_tip.json
+    rm curr_load.txt
+  done
+
+  echo "Basic installation for the core node completed."
+
+  # Check if funds arrived
+  cardano-cli query utxo \
+    --address $(cat ~/keysnaddresses/payment.addr) \
+    --$NETWORK_NAME >> curr_utxo.txt
+  python3 $CURRENT_PATH/scripts/get_curr_bal.py
+  FUND=$( cat curr_bal.txt )
+  echo "Current balance: $FUND Lovelace"
+  rm curr_bal.json
+  rm curr_utxo.json
+  while (( FUND < 505000 ))
+  do
+    echo "Funds have not arrived yet. Checking in two minutes."
+    sleep 120
+    cardano-cli query utxo \
+      --address $(cat ~/keysnaddresses/payment.addr) \
+      --$NETWORK_NAME >> curr_utxo.txt
+    python3 $CURRENT_PATH/scripts/get_curr_bal.py
+    FUND=$( cat curr_bal.txt )
+    echo "Current balance: $FUND Lovelace"
+    rm curr_bal.json
+    rm curr_utxo.json
+  done
+  echo "Funds have arrived. Able to proceed."
+
+
   ############################################################
-  # ENABLE STAKING ON THE CORE NODE
+  # GENERATE KEYS, ACCOUNTS AND ADDRESSES
   ############################################################
 
+  echo "________________________"
+  echo
+  echo "GENERATE KEYS"
+  echo "________________________"
+
   # Generate keys and addresses
+  echo "Generate addresses"
   cardano-cli address key-gen \
     --verification-key-file ~/keysnaddresses/payment.vkey \
     --signing-key-file ~/keysnaddresses/payment.skey
@@ -418,54 +475,30 @@ then
     --stake-verification-key-file ~/keysnaddresses/stake.vkey \
     --out-file ~/keysnaddresses/stake.addr \
     --$NETWORK_NAME
+  echo "Addresses generated"
 
   # Test address and node
   cardano-cli query utxo --address $(cat ~/keysnaddresses/payment.addr) --$NETWORK_NAME
   cardano-cli query tip --$NETWORK_NAME
 
-  # Request funds from FAUCET or transfer ADA from own wallet
-  echo "Blockchain downloading. This could take a while (4-12 hours depending on network amd machine performances"
-  echo "While the blockchain is loading, request funds from the Faucet for testnet or transfer ADA for mainnet"
-  P=0
-  while (( P < 99 ))
-  do
-    sleep 900
-    cardano-cli query tip --$NETWORK_NAME >> curr_tip.json
-    python3 $CURRENT_PATH/scripts/get_curr_load.py
-    P=$( cat curr_load.txt )
-    printf "Cardano network loaded at %f%%\n" $P
-    rm curr_tip.json
-    rm curr_load.txt
-  done
-
-  # Check if funds arrived
-  cardano-cli query utxo \
-    --address $(cat ~/keysnaddresses/payment.addr) \
-    --testnet-magic 1097911063 >> curr_utxo.txt
-  python3 $CURRENT_PATH/scripts/get_curr_bal.py
-  FUND=$( cat curr_bal.txt )
-  rm curr_bal.json
-  rm curr_utxo.json
-  while (( FUND < 500000 ))
-  do
-    echo "Current balance: $FUND Lovelace"
-    echo "Funds have not arrived yet. Checking in two minutes."
-    sleep 120
-    cardano-cli query utxo \
-      --address $(cat ~/keysnaddresses/payment.addr) \
-      --testnet-magic 1097911063 >> curr_utxo.txt
-    python3 $CURRENT_PATH/scripts/get_curr_bal.py
-    FUND=$( cat curr_bal.txt )
-    rm curr_bal.json
-    rm curr_utxo.json
-  done
-  echo "Funds have arrived. Able to proceed."
-
   # Generate the staking certificate
+  echo "Generate the staking certificate"
   cardano-cli stake-address registration-certificate \
     --stake-verification-key-file ~/keysnaddresses/stake.vkey \
     --out-file ~/keysnaddresses/stake.cert
+  echo "Staking certificate generated"
 
+
+  ############################################################
+  # REGISTER THE STAKING CERTIFICATE
+  ############################################################
+
+  echo "________________________"
+  echo
+  echo "REGISTER STAKING CERT"
+  echo "________________________"
+
+  echo "Generate the transaction to register the staking certificate"
   # Get the protocol parameters and extract staking registration deposit
   cardano-cli query protocol-parameters \
     --$NETWORK_NAME \
@@ -521,6 +554,7 @@ then
   FIN_BAL=$( expr $BAL - $FEE - $STK_DPST )
 
   # Build final transaction
+  echo "Build, sign and submit the registration transaction"
   cardano-cli transaction build-raw \
     --tx-in $UTXOIX \
     --tx-out $(cat ~/keysnaddresses/payment.addr)+$FIN_BAL \
@@ -544,16 +578,19 @@ then
   rm tx.signed
   rm tx.raw
   rm tx.draft
-
   echo "Staking address and certificate registered"
 
 
   ############################################################
-  # REGISTER THE CORE AS A BLOCK BUILDER
+  # GENERATE THE POOL KEYS
   ############################################################
 
-  echo "Starting the core registration"
+  echo "________________________"
+  echo
+  echo "GENERATE POOL KEYS"
+  echo "________________________"
 
+  echo "Generate the cold and KES keys"
   # Generate cold keys
   cd ~/keysnaddresses
   cardano-cli node key-gen \
@@ -578,7 +615,19 @@ then
   KES_P=$( cat kes_period.txt )
   rm genesis_tmp.json
   rm kes_period.txt
+  echo "Cold and KES keys generated"
 
+
+  ############################################################
+  # GENERATE THE POOL CERTIFICATES
+  ############################################################
+
+  echo "________________________"
+  echo
+  echo "GENERATE POOL CERT"
+  echo "________________________"
+
+  echo "Generate the operational certificate"
   # Get current slot
   cardano-cli query tip --$NETWORK_NAME >> curr_tip.json
   python3 $CURRENT_PATH/scripts/get_curr_slot.py
@@ -597,7 +646,9 @@ then
     --operational-certificate-issue-counter cold.counter \
     --kes-period KES_EP \ 
     --out-file node.cert
+  echo "Operational certificate generated"
 
+  echo "Generate the pool and pledge certificates"
   # Generate pool metadata json
   cd $CURRENT_PATH
   if [ -f pool_metadata.json ]
@@ -638,7 +689,19 @@ then
     --stake-verification-key-file stake.vkey \
     --cold-verification-key-file cold.vkey \
     --out-file delegation.cert
+  echo "Pool and pledge certificates generated"
 
+  
+  ############################################################
+  # REGISTER STAKING POOL
+  ############################################################
+
+  echo "________________________"
+  echo
+  echo "REGISTER STAKING POOL"
+  echo "________________________"
+
+  echo "Generate the transaction to register the staking pool"
   # Get current balance, utxo and ix
   cardano-cli query utxo \
     --address $(cat ~/keysnaddresses/payment.addr) \
@@ -688,6 +751,7 @@ then
   FIN_BAL=$( expr BAL - POOL_DPST -  )
 
   # Build final transaction
+  echo "Build, sign and submit the registration transaction"
   cardano-cli transaction build-raw \
     --tx-in $UTXOIX \
     --tx-out $(cat payment.addr)+FIN_BAL \
@@ -710,6 +774,7 @@ then
   cardano-cli transaction submit \
     --tx-file tx.signed \
     --$NETWORK_NAME
+  echo "Staking pool registered"
 
 
   ############################################################
@@ -721,7 +786,14 @@ then
   echo "SETUP RELAY TYPOLOGY"
   echo "________________________"
 
+###############################################################################################################
+# TO DO
+###############################################################################################################
+
+  echo "Core node set up. Vanilla run of the node shutting down"
+  tmux send-keys -t vanilla_run C-c
   tmux kill-session -t vanilla_run
+  echo "Node shut down"
 
 
   ############################################################
@@ -742,26 +814,121 @@ then
   echo "Dependencies downloaded and installed"
 
   echo "Change environment variables for gLiveView"
-  sed -i env \
-    -e "s/\#CONFIG=\"\${CNODE_HOME}\/files\/config.json\"/CONFIG=\"$CURRENT_PATH\/$FOLDER\/$NETWORK_LVL-config.json\"/g" \
-    -e "s/\#SOCKET=\"\${CNODE_HOME}\/sockets\/node0.socket\"/SOCKET=\"$CURRENT_PATH\/$FOLDER\/db\/socket\"/g"
+  # Network config
+  sed -i "s+#CONFIG=\"\${CNODE_HOME}\/files\/config.json\"+CONFIG=\"$CURRENT_PATH\/$FOLDER\/$NETWORK_LVL-config.json\"+g" env
+  # Socket
+  sed -i "s+#SOCKET=\"\${CNODE_HOME}\/sockets\/node0.socket\"+SOCKET=\"$CURRENT_PATH\/$FOLDER\/db\/node.socket\"+g" env
+  # Topology
+  sed -i "s+#TOPOLOGY=\"\${CNODE_HOME}/files/topology.json\"+SOCKET=\"$CURRENT_PATH\/$FOLDER\/$NETWORK_LVL-topology.json\"+g" env
+  # DB directory
+  sed -i "s+#DB_DIR=\"\${CNODE_HOME}/db\"+SOCKET=\"$CURRENT_PATH\/$FOLDER\/db\"+g" env
+  # Log directory
+  mkdir -p $CURRENT_PATH/$FOLDER/logs
+  sed -i "s+#LOG_DIR=\"\${CNODE_HOME}\/logs\"+LOG_DIR=\"$CURRENT_PATH\/$FOLDER\/logs\"+g" env
+  # Port
+  sed -i "s+#CNODE_PORT=6000+CNODE_PORT=$PORT+g" env
+  # Cardano node path (relay or core folder)
+  sed -i "s+#CNODE_HOME=\"\/opt\/cardano\/cnode\"+CNODE_HOME=$CURRENT_PATH\/$FOLDER+g" env
+  # Cardano node binary
+  sed -i "s+#CNODEBIN=\"\${HOME}\/.cabal\/bin\/cardano-node\"+CNODEBIN=\"\${HOME}\/.local\/bin\/cardano-node\"+g" env
+  # Cardano CLI binary
+  sed -i "s+#CCLI=\"\${HOME}\/.cabal\/bin\/cardano-cli\"+CCLI=\"\${HOME}\/.local\/bin\/cardano-cli\"+g" env
   echo "Variables updated"
 
 
   ############################################################
-  # RUN RELAY AS A SERVICE
+  # RUN CORE NODE AS A SERVICE
   ############################################################
 
   echo "________________________"
   echo
-  echo "RUN RELAY AS A SERVICE"
+  echo "RUN CORE AS A SERVICE"
   echo "________________________"
+
+  # Create and parametrize the systemd structure
+  mkdir -p /etc/systemd
+  mkdir -p /etc/systemd/system/
+
+  # Create the service in systemd
+  if [ -f /etc/systemd/system/cardano_core.service ]
+  then
+    rm /etc/systemd/system/cardano_core.service
+  fi
+
+  # Generate cardano_core_launch script
+  echo "Generate the sh launch script"
+
+  echo "#!/bin/bash" >> $CURRENT_PATH/launch_script.sh
+  echo "$NODE_RUN" >> $CURRENT_PATH/launch_script.sh
+
+  chmod +x ./launch_script.sh
+  echo "Launch script generated"
+
+  # Generate the service file
+  echo "Generate the systemd file"
+
+  echo "[Unit]" >> /etc/systemd/system/cardano_core.service
+  echo "Description=Cardano core node" >> /etc/systemd/system/cardano_core.service
+  echo "Wants=network-online.target" >> /etc/systemd/system/cardano_core.service
+  echo "After=network-online.target" >> /etc/systemd/system/cardano_core.service
+  echo "" >> /etc/systemd/system/cardano_core.service
+  echo "[Service]" >> /etc/systemd/system/cardano_core.service
+  echo "User=$USER"
+  echo "Type=Simple" >> /etc/systemd/system/cardano_core.service
+  echo "WorkingDirectory=$CURRENT_PATH" >> /etc/systemd/system/cardano_core.service
+  echo "ExecStart=bash $CURRENT_PATH/launch_script.sh" >> /etc/systemd/system/cardano_core.service
+  echo "Restart=always" >> /etc/systemd/system/cardano_core.service
+  echo "RestartSec=5" >> /etc/systemd/system/cardano_core.service
+  echo "KillSignal=SIGINT" >> /etc/systemd/system/cardano_core.service
+  echo "RestartKillSignal=SIGINT" >> /etc/systemd/system/cardano_core.service
+  echo "TimeoutStopSec=300" >> /etc/systemd/system/cardano_core.service
+  echo "SyslogIdentifier=cardano-node" >> /etc/systemd/system/cardano_core.service
+  echo "" >> /etc/systemd/system/cardano_core.service
+  echo "[Install]" >> /etc/systemd/system/cardano_core.service
+  echo "WantedBy=multi-user.target" >> /etc/systemd/system/cardano_core.service
+  echo "" >> /etc/systemd/system/cardano_core.service
+
+  sudo chmod 644 /etc/systemd/system/cardano_core.service
+  echo "Systemd file generated"
+
+  # Run the service
+  echo "Launch the node as a service"
+  sudo systemctl daemon-reload
+  sudo systemctl enable cardano_core
+  sudo systemctl start cardano_core
+
+  # Check if service running
+  systemctl status cardano_core >> service_status_raw.txt
+  python3 $CURRENT_PATH/scripts/get_service_status.py
+  SRV_ST=$( cat service_status.txt )
+
+  if [[ "$SRV_ST" == "active" ]]
+  then
+    echo "Installation and deployment of the core node completed."
+    echo "Core node deployment completed!"
+  else
+    echo "Something failed. Node not running. Investigate"
+  fi
+
+  rm service_status_raw.txt
+  rm service_status.txt
+
+  
+
+
+###############################################################################################################
+# TO DO
+###############################################################################################################
+
+
 
   # Wait a few minutes and test existence of the pool
   echo "The system will wait for 5 minutes before checking the registration of the pool on the network"
   sleep 300
   cardano-cli stake-pool id --cold-verification-key-file cold.vkey --output-format "hex"
 
+
+  return 0
 fi
 
 
