@@ -36,17 +36,19 @@ IP_ADDR="0.0.0.0"
 PORT="6000"
 
 # Relay IP (only necessary for the core node)
+# Needs to be set up manually on AWS as Elastic IPv4
 RELAY_IP="ec2-3-126-55-135.eu-central-1.compute.amazonaws.com"
 RELAY_PORT="6000"
 
 # Core IP
+# Needs to be set up manually on AWS as Elastic IPv4
 CORE_IP="ec2-3-72-77-139.eu-central-1.compute.amazonaws.com"
 CORE_PORT="6000"
 
-if [ NODE = "CORE" ]
+if [[ "$NODE" == "CORE" ]]
 then
   FOLDER="core"
-elif [ NODE = "RELAY" ]
+elif [[ "$NODE" == "RELAY" ]]
 then
   FOLDER="relay"
 fi
@@ -204,8 +206,8 @@ NODE_RUN="cardano-node run \
 tmux new -d -s vanilla_run
 tmux send-keys -t vanilla_run "$NODE_RUN" Enter
 
-echo "Node started successfully, waiting for the socket to be created"
-sleep 10
+echo "Node started successfully, waiting for the socket to be created (30 secs)"
+sleep 30
 
 # Make accessible and dave the node socket path in the environment variables
 echo -e "export CARDANO_NODE_SOCKET_PATH=\"~/$FOLDER/db/node.socket\"" >> ~/.bashrc
@@ -217,21 +219,21 @@ chmod 777 ~/$FOLDER/db/node.socket
 # THIS IS WHERE RELAY AND CORE ARE DIFFERENTIATED
 ###########################################################
 
-if [ $NODE = "RELAY" ]
+if [[ "$NODE" == "RELAY" ]]
 then
 
   echo "Blockchain downloading. This could take a while (4-12 hours depending on network amd machine performances)"
 
-  P=0.0
-  while [ $P < 99.9 ]
+  P=0
+  while (( P < 99 ))
   do
     sleep 900
     cardano-cli query tip --$NETWORK_NAME >> curr_tip.json
-    python $CURRENT_PATH/scripts/get_curr_load.py
+    python3 $CURRENT_PATH/scripts/get_curr_load.py
     P=$( cat curr_load.txt )
-    printf "Cardano network loaded at %f%%\n" $P
+    echo "Cardano network loaded at $P%"
     rm curr_tip.json
-    rm curr_load.json
+    rm curr_load.txt
   done
 
   echo "Basic installation for the relay node completed, shutting down the node vanilla run"
@@ -259,7 +261,7 @@ then
   echo "Set up relay node typology file"
   echo $CORE_IP >> core_ip.txt
   echo $CORE_PORT >> core_port.txt
-  python $CURRENT_PATH/scripts/create_relay_topology.py
+  python3 $CURRENT_PATH/scripts/create_relay_topology.py
   cp $CURRENT_PATH/topology_raw.json ~/$FOLDER/$NETWORK_LVL-topology.json
   rm core_port.txt
   rm core_ip.txt
@@ -286,9 +288,25 @@ then
   echo "Dependencies downloaded and installed"
 
   echo "Change environment variables for gLiveView"
-  sed -i env \
-    -e "s/\#CONFIG=\"\${CNODE_HOME}\/files\/config.json\"/CONFIG=\"$CURRENT_PATH\/$FOLDER\/$NETWORK_LVL-config.json\"/g" \
-    -e "s/\#SOCKET=\"\${CNODE_HOME}\/sockets\/node0.socket\"/SOCKET=\"$CURRENT_PATH\/$FOLDER\/db\/socket\"/g"
+  # Network config
+  sed -i "s+#CONFIG=\"\${CNODE_HOME}\/files\/config.json\"+CONFIG=\"$CURRENT_PATH\/$FOLDER\/$NETWORK_LVL-config.json\"+g" env
+  # Socket
+  sed -i "s+#SOCKET=\"\${CNODE_HOME}\/sockets\/node0.socket\"+SOCKET=\"$CURRENT_PATH\/$FOLDER\/db\/node.socket\"+g" env
+  # Topology
+  sed -i "s+#TOPOLOGY=\"\${CNODE_HOME}/files/topology.json\"+SOCKET=\"$CURRENT_PATH\/$FOLDER\/$NETWORK_LVL-topology.json\"+g" env
+  # DB directory
+  sed -i "s+#DB_DIR=\"\${CNODE_HOME}/db\"+SOCKET=\"$CURRENT_PATH\/$FOLDER\/db\"+g" env
+  # Log directory
+  mkdir -p $CURRENT_PATH/$FOLDER/logs
+  sed -i "s+#LOG_DIR=\"\${CNODE_HOME}\/logs\"+LOG_DIR=\"$CURRENT_PATH\/$FOLDER\/logs\"+g" env
+  # Port
+  sed -i "s+#CNODE_PORT=6000+CNODE_PORT=$PORT+g" env
+  # Cardano node path (relay or core folder)
+  sed -i "s+#CNODE_HOME=\"\/opt\/cardano\/cnode\"+CNODE_HOME=$CURRENT_PATH\/$FOLDER+g" env
+  # Cardano node binary
+  sed -i "s+#CNODEBIN=\"\${HOME}\/.cabal\/bin\/cardano-node\"+CNODEBIN=\"\${HOME}\/.local\/bin\/cardano-node\"+g" env
+  # Cardano CLI binary
+  sed -i "s+#CCLI=\"\${HOME}\/.cabal\/bin\/cardano-cli\"+CCLI=\"\${HOME}\/.local\/bin\/cardano-cli\"+g" env
   echo "Variables updated"
 
 
@@ -331,7 +349,7 @@ then
   echo "[Service]" >> /etc/systemd/system/cardano_relay.service
   echo "User=$USER"
   echo "Type=Simple" >> /etc/systemd/system/cardano_relay.service
-  echo "WorkingDirectory= $CURRENT_PATH" >> /etc/systemd/system/cardano_relay.service
+  echo "WorkingDirectory=$CURRENT_PATH" >> /etc/systemd/system/cardano_relay.service
   echo "ExecStart=bash $CURRENT_PATH/launch_script.sh" >> /etc/systemd/system/cardano_relay.service
   echo "Restart=always" >> /etc/systemd/system/cardano_relay.service
   echo "RestartSec=5" >> /etc/systemd/system/cardano_relay.service
@@ -341,7 +359,7 @@ then
   echo "SyslogIdentifier=cardano-node" >> /etc/systemd/system/cardano_relay.service
   echo "" >> /etc/systemd/system/cardano_relay.service
   echo "[Install]" >> /etc/systemd/system/cardano_relay.service
-  echo "WantedBy	= multi-user.target" >> /etc/systemd/system/cardano_relay.service
+  echo "WantedBy=multi-user.target" >> /etc/systemd/system/cardano_relay.service
   echo "" >> /etc/systemd/system/cardano_relay.service
 
   sudo chmod 644 /etc/systemd/system/cardano_relay.service
@@ -355,10 +373,10 @@ then
 
   # Check if service running
   systemctl status cardano_relay >> service_status_raw.txt
-  python $CURRENT_PATH/scripts/get_service_status.py
+  python3 $CURRENT_PATH/scripts/get_service_status.py
   SRV_ST=$( cat service_status.txt )
 
-  if [ $SRV_ST = "active" ]
+  if [[ "$SRV_ST" == "active" ]]
   then
     echo "Installation and deployment of the relay node completed."
     echo "Relay node deployment completed!"
@@ -375,7 +393,7 @@ then
 ############################################################
 # CORE NODE SETUP
 ############################################################
-elif [ $NODE = "CORE" ]
+elif [ $NODE == "CORE" ]
 then
   ############################################################
   # ENABLE STAKING ON THE CORE NODE
@@ -408,34 +426,35 @@ then
   # Request funds from FAUCET or transfer ADA from own wallet
   echo "Blockchain downloading. This could take a while (4-12 hours depending on network amd machine performances"
   echo "While the blockchain is loading, request funds from the Faucet for testnet or transfer ADA for mainnet"
-  P=0.0
-  while [ $P < 99.9 ]
+  P=0
+  while (( P < 99 ))
   do
     sleep 900
     cardano-cli query tip --$NETWORK_NAME >> curr_tip.json
-    python $CURRENT_PATH/scripts/get_curr_load.py
+    python3 $CURRENT_PATH/scripts/get_curr_load.py
     P=$( cat curr_load.txt )
     printf "Cardano network loaded at %f%%\n" $P
     rm curr_tip.json
-    rm curr_load.json
+    rm curr_load.txt
   done
 
   # Check if funds arrived
   cardano-cli query utxo \
     --address $(cat ~/keysnaddresses/payment.addr) \
     --testnet-magic 1097911063 >> curr_utxo.txt
-  python $CURRENT_PATH/scripts/get_curr_bal.py
+  python3 $CURRENT_PATH/scripts/get_curr_bal.py
   FUND=$( cat curr_bal.txt )
   rm curr_bal.json
   rm curr_utxo.json
-  while [ FUND < 0.1 ]
+  while (( FUND < 500000 ))
   do
+    echo "Current balance: $FUND Lovelace"
     echo "Funds have not arrived yet. Checking in two minutes."
     sleep 120
     cardano-cli query utxo \
       --address $(cat ~/keysnaddresses/payment.addr) \
       --testnet-magic 1097911063 >> curr_utxo.txt
-    python $CURRENT_PATH/scripts/get_curr_bal.py
+    python3 $CURRENT_PATH/scripts/get_curr_bal.py
     FUND=$( cat curr_bal.txt )
     rm curr_bal.json
     rm curr_utxo.json
@@ -451,13 +470,13 @@ then
   cardano-cli query protocol-parameters \
     --$NETWORK_NAME \
     --out-file protocol.json
-  python $CURRENT_PATH/scripts/get_staking_deposit.py
+  python3 $CURRENT_PATH/scripts/get_staking_deposit.py
   STK_DPST=$( cat staking_deposit.txt )
   rm staking_deposit.txt
 
   # Get current slot for TTL
   cardano-cli query tip --$NETWORK_NAME >> curr_tip.json
-  python $CURRENT_PATH/scripts/get_curr_slot.py
+  python3 $CURRENT_PATH/scripts/get_curr_slot.py
   SLOT=$( cat curr_slot.txt )
   SLOT =$( expr $SLOT + 2000 )
   rm curr_tip.json
@@ -467,9 +486,9 @@ then
   cardano-cli query utxo \
     --address $(cat ~/keysnaddresses/payment.addr) \
     --$NETWORK_NAME >> curr_utxo.txt
-  python $CURRENT_PATH/scripts/get_curr_utxo_ix.py
+  python3 $CURRENT_PATH/scripts/get_curr_utxo_ix.py
   UTXOIX=$( cat curr_utxo_ix.txt )
-  python $CURRENT_PATH/scripts/get_curr_bal.py
+  python3 $CURRENT_PATH/scripts/get_curr_bal.py
   BAL=$( cat curr_bal.txt )
   rm curr_bal.txt
   rm curr_utxo.txt
@@ -493,7 +512,7 @@ then
     --byron-witness-count 0 \
     --$NETWORK_NAME \
     --protocol-params-file protocol.json >> fee_raw.txt
-  python $CURRENT_PATH/scripts/get_fee.py
+  python3 $CURRENT_PATH/scripts/get_fee.py
   FEE=$( cat fee.txt )
   rm fee_raw.txt
   rm fee.txt
@@ -555,14 +574,14 @@ then
   # Get the KES period
   cd ~
   cp ~/$NODE/$NETWORK_LVL-shelley-genesis.json ~/genesis_tmp.json
-  python $CURRENT_PATH/scripts/get_kes.py
+  python3 $CURRENT_PATH/scripts/get_kes.py
   KES_P=$( cat kes_period.txt )
   rm genesis_tmp.json
   rm kes_period.txt
 
   # Get current slot
   cardano-cli query tip --$NETWORK_NAME >> curr_tip.json
-  python $CURRENT_PATH/scripts/get_curr_slot.py
+  python3 $CURRENT_PATH/scripts/get_curr_slot.py
   SLOT=$( cat curr_slot.txt )
   rm curr_tip.json
   rm curr_slot.txt
@@ -624,9 +643,9 @@ then
   cardano-cli query utxo \
     --address $(cat ~/keysnaddresses/payment.addr) \
     --$NETWORK_NAME >> curr_utxo.txt
-  python $CURRENT_PATH/scripts/get_curr_utxo_ix.py
+  python3 $CURRENT_PATH/scripts/get_curr_utxo_ix.py
   UTXOIX=$( cat curr_utxo_ix.txt )
-  python $CURRENT_PATH/scripts/get_curr_bal.py
+  python3 $CURRENT_PATH/scripts/get_curr_bal.py
   BAL=$( cat curr_bal.txt )
   rm curr_bal.txt
   rm curr_utxo.txt
@@ -646,7 +665,7 @@ then
   cardano-cli query protocol-parameters \
     --$NETWORK_NAME \
     --out-file protocol.json
-  python $CURRENT_PATH/scripts/get_pool_deposit.py
+  python3 $CURRENT_PATH/scripts/get_pool_deposit.py
   POOL_DPST=$( cat pool_deposit.txt )
   rm pool_deposit.txt
 
@@ -659,7 +678,7 @@ then
     --byron-witness-count 0 \
     --$NETWORK_NAME \
     --protocol-params-file protocol.json >> fee_raw.txt
-  python $CURRENT_PATH/scripts/get_fee.py
+  python3 $CURRENT_PATH/scripts/get_fee.py
   FEE=$( cat fee.txt )
   rm fee_raw.txt
   rm fee.txt
