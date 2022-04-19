@@ -11,7 +11,7 @@ Hi! In this repo, we propose a semi-automated approach that facilitates the depl
 4. Create and upload the metadata (see example below) to the repository using [TinyURL](https://tinyurl.com/app)
 5. The metadata file must also be stored where the autodeploy.sh file will be executed.
 6. Amend the deployment script to suit your deployment pattern and configurated VMs.
-7. (Optional) If available, copy an existing synced <code>db</code> folder beside the autodeploy.sh script as <code>presync</code>
+7. (Optional) If available, copy an existing synced <code>db</code> folder beside the `auto_deploy.sh` script as <code>presync</code>
 
 ### Example file
 The file should be a json file following the below pattern:
@@ -37,11 +37,11 @@ Machines can be VMs from a cloud provider or personal servers.
 On AWS, this configuration is best represented by the m4.xlarge EC2 machines.
 
 ## How to use the deployment scripts
-The successful deployment of a Cardano stake pool using this approach can be decomposed into XXX steps:
-1. Run the script on the relay infrastructure (should complete without intervention)
+The successful deployment of a Cardano stake pool using this approach can be decomposed into 5 steps:
+1. Run the script on the relay infrastructure with `-i` flag (should complete without intervention)
 2. Check relay deployment by checking the gLiveView (cmd: <code>glv</code>)
-3. Run the script on the core node infrastructure (make sure the prerequisits are setup)
-4. Once signalled by the program, sendthe funds necessary for the registration
+3. Run the script on the core node infrastructure `-i` flag (make sure the prerequisits are setup)
+4. Once signalled by the program, send the funds necessary for the registration
 5. Check the core node deployment by checking the gLiveView and [pooltool.io](https://pooltool.io/)
 
 ## Disclaimer
