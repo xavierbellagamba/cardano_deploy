@@ -37,7 +37,7 @@ PORT="6000"
 
 # Relay IP (only necessary for the core node)
 # Needs to be set up manually on AWS as Elastic IPv4
-N_RELAY=2 #1 or 2
+N_RELAY=2 # 1 or 2
 RELAY_DNS="ec2-18-194-10-11.eu-central-1.compute.amazonaws.com"
 RELAY_PORT="6000"
 RELAY_DNS_2="ec2-52-57-255-147.eu-central-1.compute.amazonaws.com"
@@ -68,12 +68,15 @@ echo
 echo "CHECK IF METADATA READY"
 echo "________________________"
 
-if [ -f pool_metadata.json ]
+if [[ "$NODE" == "CORE" ]]
 then
-  echo "File existing. Able to proceed. Make sure it is online before finalizing the install"
-else
-  echo "File non-existing. Please make sure pool_metadata.json exists where the script is being run"
-  return 1
+  if [ -f pool_metadata.json ]
+  then
+    echo "File existing. Able to proceed. Make sure it is online before finalizing the install"
+  else
+    echo "File non-existing. Please make sure pool_metadata.json exists where the script is being run"
+    return 1
+  fi
 fi
 
 
@@ -281,17 +284,17 @@ then
 
   echo "________________________"
   echo
-  echo "SETUP RELAY TYPOLOGY"
+  echo "SETUP RELAY TOPOLOGY"
   echo "________________________"
 
   # Get list from repo
-  echo "Getting the latest full typology file"
+  echo "Getting the latest full topology file"
   cd $CURRENT_PATH
   wget https://explorer.cardano-mainnet.iohk.io/relays/topology.json
   echo "Topology file downloaded"
 
   # Random selection of other relay nodes and add core node to the list (1st item)
-  echo "Set up relay node typology file"
+  echo "Set up relay node topology file"
   echo $CORE_DNS >> core_dns.txt
   echo $CORE_PORT >> core_port.txt
   python3 $CURRENT_PATH/scripts/create_relay_topology.py
@@ -300,7 +303,7 @@ then
   rm core_dns.txt
   rm topology_raw.json
   rm topology.json
-  echo "Typology file of the relay node set up"
+  echo "Topology file of the relay node set up"
 
 
   ############################################################
@@ -834,12 +837,12 @@ then
 
 
   ############################################################
-  # SETUP RELAY TYPOLOGY
+  # SETUP CORE TOPOLOGY
   ############################################################
 
   echo "________________________"
   echo
-  echo "SETUP RELAY TYPOLOGY"
+  echo "SETUP CORE TOPOLOGY"
   echo "________________________"
 
   echo "Core node set up. Vanilla run of the node shutting down"
@@ -848,13 +851,13 @@ then
   echo "Node shut down"
 
   # Get list from repo
-  echo "Getting the latest full typology file"
+  echo "Getting the latest full topology file"
   cd $CURRENT_PATH
   wget https://explorer.cardano-mainnet.iohk.io/relays/topology.json
   echo "Topology file downloaded"
 
   # Random selection of other relay nodes and add core node to the list (1st item)
-  echo "Set up relay node typology file"
+  echo "Set up core node topology file"
   echo $RELAY_DNS >> relay_dns.txt
   echo $RELAY_PORT >> relay_port.txt
   if (( N_RELAY == 2 ))
@@ -873,7 +876,7 @@ then
   fi
   rm topology_raw.json
   rm topology.json
-  echo "Typology file of the relay node set up"
+  echo "Topology file of the core node set up"
 
 
   ############################################################
