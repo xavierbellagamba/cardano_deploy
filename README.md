@@ -11,15 +11,17 @@ Hi! In this repo, we propose a semi-automated approach that facilitates the depl
 4. Create and upload the metadata (see example below) to the repository using [TinyURL](https://tinyurl.com/app)
 5. The metadata file must also be stored where the autodeploy.sh file will be executed.
 6. Amend the deployment script to suit your deployment pattern and configurated VMs.
+7. (Optional) If available, copy an existing synced <code>db</code> folder beside the autodeploy.sh script as <code>presync</code>
 
 ### Example file
 The file should be a json file following the below pattern:
+
 <code>
-{
-  "name": "versorium",
-  "description": "The versorium.io pool",
-  "ticker": "VRSM",
-  "homepage": "https://versorium.io"
+{\n
+  "name": "versorium",\n
+  "description": "The versorium.io pool",\n
+  "ticker": "VRSM",\n
+  "homepage": "https://versorium.io"\n
 }
 </code>
 
