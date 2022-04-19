@@ -13,12 +13,12 @@ NODE="RELAY" # "CORE" or "RELAY"
 # Pool parameters (only for core node)
 PLEDGE=100000000
 COST=340000000
-MARGIN=0.02
-POOL_NAME="test"
-POOL_TCKR="TTTT"
-POOL_DESCR="test pool on testnet"
-POOL_HOME="SomeAddress"
-POOL_META_URL="someotheraddress.com"
+MARGIN=0.0195
+POOL_NAME="versorium"
+POOL_TCKR="VRSM"
+POOL_DESCR="The versorium.io pool"
+POOL_HOME="https://versorium.io"
+POOL_META_URL="https://tinyurl.com/versorium"
 
 # Cabal-related parameters
 CABAL_REPO="https://downloads.haskell.org/~cabal/cabal-install-3.6.2.0/"
@@ -54,6 +54,24 @@ then
 fi
 
 CURRENT_PATH="$PWD"
+
+
+############################################################
+# CHECK IF METADATA READY
+############################################################
+
+echo "________________________"
+echo
+echo "CHECK IF METADATA READY"
+echo "________________________"
+
+if [ -f pool_metadata.json ]
+then
+  echo "File existing. Able to proceed. Make sure it is online before finalizing the install"
+else
+  echo "File non-existing. Please make sure pool_metadata.json exists where the script is being run"
+  return 1
+fi
 
 
 ############################################################
@@ -426,30 +444,6 @@ then
 
   echo "Basic installation for the core node completed."
 
-  # Check if funds arrived
-  cardano-cli query utxo \
-    --address $(cat ~/keysnaddresses/payment.addr) \
-    --$NETWORK_NAME >> curr_utxo.txt
-  python3 $CURRENT_PATH/scripts/get_curr_bal.py
-  FUND=$( cat curr_bal.txt )
-  echo "Current balance: $FUND Lovelace"
-  rm curr_bal.json
-  rm curr_utxo.json
-  while (( FUND < 505000 ))
-  do
-    echo "Funds have not arrived yet. Checking in two minutes."
-    sleep 120
-    cardano-cli query utxo \
-      --address $(cat ~/keysnaddresses/payment.addr) \
-      --$NETWORK_NAME >> curr_utxo.txt
-    python3 $CURRENT_PATH/scripts/get_curr_bal.py
-    FUND=$( cat curr_bal.txt )
-    echo "Current balance: $FUND Lovelace"
-    rm curr_bal.json
-    rm curr_utxo.json
-  done
-  echo "Funds have arrived. Able to proceed."
-
 
   ############################################################
   # GENERATE KEYS, ACCOUNTS AND ADDRESSES
@@ -457,7 +451,7 @@ then
 
   echo "________________________"
   echo
-  echo "GENERATE KEYS"
+  echo "CREATE ADDRESSES & KEYS"
   echo "________________________"
 
   # Generate keys and addresses
@@ -492,6 +486,40 @@ then
     --stake-verification-key-file ~/keysnaddresses/stake.vkey \
     --out-file ~/keysnaddresses/stake.cert
   echo "Staking certificate generated"
+
+
+  ############################################################
+  # WAIT FOR THE FUNDS ARRIVAL
+  ############################################################
+
+  echo "________________________"
+  echo
+  echo "CHECK FOR FUNDS ARRIVAL"
+  echo "________________________"
+
+  # Check if funds arrived
+  cardano-cli query utxo \
+    --address $(cat ~/keysnaddresses/payment.addr) \
+    --$NETWORK_NAME >> curr_utxo.txt
+  python3 $CURRENT_PATH/scripts/get_curr_bal.py
+  FUND=$( cat curr_bal.txt )
+  echo "Current balance: $FUND Lovelace"
+  rm curr_bal.json
+  rm curr_utxo.json
+  while (( FUND < 505000 ))
+  do
+    echo "Funds have not arrived yet. Checking in two minutes."
+    sleep 120
+    cardano-cli query utxo \
+      --address $(cat ~/keysnaddresses/payment.addr) \
+      --$NETWORK_NAME >> curr_utxo.txt
+    python3 $CURRENT_PATH/scripts/get_curr_bal.py
+    FUND=$( cat curr_bal.txt )
+    echo "Current balance: $FUND Lovelace"
+    rm curr_bal.json
+    rm curr_utxo.json
+  done
+  echo "Funds have arrived. Able to proceed."
 
 
   ############################################################
@@ -654,19 +682,7 @@ then
   echo "Operational certificate generated"
 
   echo "Generate the pool and pledge certificates"
-  # Generate pool metadata json
   cd $CURRENT_PATH
-  if [ -f pool_metadata.json ]
-  then
-    rm pool_metadata.json
-  fi
-  echo -e "{" >> pool_metadata.json
-  echo -e "\t\"name\": \"$POOL_NAME\"," >> pool_metadata.json
-  echo -e "\t\"description\": \"$POOL_DESCR\"," >> pool_metadata.json
-  echo -e "\t\"ticker\": \"$POOL_TCKR\"," >> pool_metadata.json
-  echo -e "\t\"homepage\": \"$POOL_HOME\"" >> pool_metadata.json
-  echo -e "}" >> pool_metadata.json
-
   # Get the hash of it
   cardano-cli stake-pool metadata-hash --pool-metadata-file pool_metadata.json >> hash.txt
   HASH=$( cat hash.txt )
