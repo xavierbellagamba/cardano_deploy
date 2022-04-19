@@ -4,7 +4,7 @@ import random
 with open('topology.json', 'r') as f:
     data = json.load(f)
 
-with open('core_ip.txt', 'r') as f:
+with open('core_dns.txt', 'r') as f:
     ip = f.read()
 
 with open('core_port.txt', 'r') as f:

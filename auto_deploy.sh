@@ -11,9 +11,9 @@
 NODE="RELAY" # "CORE" or "RELAY"
 
 # Pool parameters (only for core node)
-PLEDGE=100000000
+PLEDGE=25000000000
 COST=340000000
-MARGIN=0.0195
+MARGIN=0.0225
 POOL_NAME="versorium"
 POOL_TCKR="VRSM"
 POOL_DESCR="The versorium.io pool"
@@ -37,12 +37,15 @@ PORT="6000"
 
 # Relay IP (only necessary for the core node)
 # Needs to be set up manually on AWS as Elastic IPv4
-RELAY_IP="ec2-3-126-55-135.eu-central-1.compute.amazonaws.com"
+N_RELAY=2 #1 or 2
+RELAY_DNS="ec2-18-194-10-11.eu-central-1.compute.amazonaws.com"
 RELAY_PORT="6000"
+RELAY_DNS_2="ec2-52-57-255-147.eu-central-1.compute.amazonaws.com"
+RELAY_PORT_2="6000"
 
 # Core IP
 # Needs to be set up manually on AWS as Elastic IPv4
-CORE_IP="ec2-3-72-77-139.eu-central-1.compute.amazonaws.com"
+CORE_DNS="ec2-18-156-17-168.eu-central-1.compute.amazonaws.com"
 CORE_PORT="6000"
 
 if [[ "$NODE" == "CORE" ]]
@@ -281,12 +284,12 @@ then
 
   # Random selection of other relay nodes and add core node to the list (1st item)
   echo "Set up relay node typology file"
-  echo $CORE_IP >> core_ip.txt
+  echo $CORE_DNS >> core_dns.txt
   echo $CORE_PORT >> core_port.txt
   python3 $CURRENT_PATH/scripts/create_relay_topology.py
   cp $CURRENT_PATH/topology_raw.json ~/$FOLDER/$NETWORK_LVL-topology.json
   rm core_port.txt
-  rm core_ip.txt
+  rm core_dns.txt
   rm topology_raw.json
   rm topology.json
   echo "Typology file of the relay node set up"
@@ -506,7 +509,7 @@ then
   echo "Current balance: $FUND Lovelace"
   rm curr_bal.json
   rm curr_utxo.json
-  while (( FUND < 505000 ))
+  while (( FUND < 505000000 ))
   do
     echo "Funds have not arrived yet. Checking in two minutes."
     sleep 120
@@ -690,20 +693,40 @@ then
 
   # Generate stake pool certificate
   cd ~/keysnaddresses
-  cardano-cli stake-pool registration-certificate \
-    --cold-verification-key-file cold.vkey \
-    --vrf-verification-key-file vrf.vkey \
-    --pool-pledge $PLEDGE \
-    --pool-cost $COST \
-    --pool-margin $MARGIN \
-    --pool-reward-account-verification-key-file stake.vkey \
-    --pool-owner-stake-verification-key-file stake.vkey \
-    --$NETWORK_NAME \
-    --pool-relay-ipv4 $RELAY_IP \
-    --pool-relay-port $RELAY_PORT \
-    --metadata-url $POOL_META_URL \
-    --metadata-hash $HASH \
-    --out-file pool-registration.cert
+  if (( N_RELAY == 2 ))
+  then
+    cardano-cli stake-pool registration-certificate \
+      --cold-verification-key-file cold.vkey \
+      --vrf-verification-key-file vrf.vkey \
+      --pool-pledge $PLEDGE \
+      --pool-cost $COST \
+      --pool-margin $MARGIN \
+      --pool-reward-account-verification-key-file stake.vkey \
+      --pool-owner-stake-verification-key-file stake.vkey \
+      --$NETWORK_NAME \
+      --single-host-pool-relay $RELAY_DNS \
+      --pool-relay-port $RELAY_PORT \
+      --single-host-pool-relay $RELAY_DNS_2 \
+      --pool-relay-port $RELAY_PORT_2 \
+      --metadata-url $POOL_META_URL \
+      --metadata-hash $HASH \
+      --out-file pool-registration.cert
+  else
+    cardano-cli stake-pool registration-certificate \
+      --cold-verification-key-file cold.vkey \
+      --vrf-verification-key-file vrf.vkey \
+      --pool-pledge $PLEDGE \
+      --pool-cost $COST \
+      --pool-margin $MARGIN \
+      --pool-reward-account-verification-key-file stake.vkey \
+      --pool-owner-stake-verification-key-file stake.vkey \
+      --$NETWORK_NAME \
+      --single-host-pool-relay $RELAY_DNS \
+      --pool-relay-port $RELAY_PORT \
+      --metadata-url $POOL_META_URL \
+      --metadata-hash $HASH \
+      --out-file pool-registration.cert
+  fi
     
   # Generate the pledge certificate
   cardano-cli stake-address delegation-certificate \
@@ -820,12 +843,22 @@ then
 
   # Random selection of other relay nodes and add core node to the list (1st item)
   echo "Set up relay node typology file"
-  echo $RELAY_IP >> relay_ip.txt
+  echo $RELAY_DNS >> relay_dns.txt
   echo $RELAY_PORT >> relay_port.txt
-  python3 $CURRENT_PATH/scripts/create_relay_topology.py
+  if (( N_RELAY == 2 ))
+  then
+    echo $RELAY_DNS_2 >> relay_dns_2.txt
+    echo $RELAY_PORT_2 >> relay_port_2.txt
+  fi
+  python3 $CURRENT_PATH/scripts/create_core_topology.py
   cp $CURRENT_PATH/topology_raw.json ~/$FOLDER/$NETWORK_LVL-topology.json
   rm relay_port.txt
-  rm relay_ip.txt
+  rm relay_dns.txt
+  if (( N_RELAY == 2 ))
+  then
+    rm relay_port_2.txt
+    rm relay_dns_2.txt
+  fi
   rm topology_raw.json
   rm topology.json
   echo "Typology file of the relay node set up"
