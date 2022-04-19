@@ -16,14 +16,12 @@ Hi! In this repo, we propose a semi-automated approach that facilitates the depl
 ### Example file
 The file should be a json file following the below pattern:
 
-<code>
-{\n
-  "name": "versorium",\n
-  "description": "The versorium.io pool",\n
-  "ticker": "VRSM",\n
-  "homepage": "https://versorium.io"\n
-}
-</code>
+    {
+      "name": "versorium",
+      "description": "The versorium.io pool",
+      "ticker": "VRSM",
+      "homepage": "https://versorium.io"
+    }
 
 ## Minimum configuration
 Two to three machines are necessary to operate a staking pool. 
