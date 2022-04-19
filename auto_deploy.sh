@@ -206,8 +206,8 @@ NODE_RUN="cardano-node run \
 tmux new -d -s vanilla_run
 tmux send-keys -t vanilla_run "$NODE_RUN" Enter
 
-echo "Node started successfully, waiting for the socket to be created (30 secs)"
-sleep 30
+echo "Node started successfully, waiting for the socket to be created (5 mins)"
+sleep 300
 
 # Make accessible and dave the node socket path in the environment variables
 echo -e "export CARDANO_NODE_SOCKET_PATH=\"~/$FOLDER/db/node.socket\"" >> ~/.bashrc
@@ -283,7 +283,8 @@ then
   echo "SETUP gLiveView"
   echo "________________________"
 
-  cd $CURRENT_PATH
+  mkdir -p $CURRENT_PATH/gLiveView
+  cd $CURRENT_PATH/gLiveView
   echo "Download the dependencies and package"
   sudo apt-get install bc tcptraceroute -y
   curl -s -o gLiveView.sh https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/gLiveView.sh
@@ -312,6 +313,10 @@ then
   # Cardano CLI binary
   sed -i "s+#CCLI=\"\${HOME}\/.cabal\/bin\/cardano-cli\"+CCLI=\"\${HOME}\/.local\/bin\/cardano-cli\"+g" env
   echo "Variables updated"
+
+  cd $CURRENT_PATH
+  echo "alias glv=\"$CURRENT_PATH/gLiveView/gLiveView.sh\"" >> .bashrc
+  echo "gLiveView available from the console using \"glv\""
 
 
   ############################################################
@@ -786,14 +791,28 @@ then
   echo "SETUP RELAY TYPOLOGY"
   echo "________________________"
 
-###############################################################################################################
-# TO DO
-###############################################################################################################
-
   echo "Core node set up. Vanilla run of the node shutting down"
   tmux send-keys -t vanilla_run C-c
   tmux kill-session -t vanilla_run
   echo "Node shut down"
+
+  # Get list from repo
+  echo "Getting the latest full typology file"
+  cd $CURRENT_PATH
+  wget https://explorer.cardano-mainnet.iohk.io/relays/topology.json
+  echo "Topology file downloaded"
+
+  # Random selection of other relay nodes and add core node to the list (1st item)
+  echo "Set up relay node typology file"
+  echo $RELAY_IP >> relay_ip.txt
+  echo $RELAY_PORT >> relay_port.txt
+  python3 $CURRENT_PATH/scripts/create_relay_topology.py
+  cp $CURRENT_PATH/topology_raw.json ~/$FOLDER/$NETWORK_LVL-topology.json
+  rm relay_port.txt
+  rm relay_ip.txt
+  rm topology_raw.json
+  rm topology.json
+  echo "Typology file of the relay node set up"
 
 
   ############################################################
@@ -805,7 +824,8 @@ then
   echo "SETUP gLiveView"
   echo "________________________"
 
-  cd $CURRENT_PATH
+  mkdir -p $CURRENT_PATH/gLiveView
+  cd $CURRENT_PATH/gLiveView
   echo "Download the dependencies and package"
   sudo apt-get install bc tcptraceroute -y
   curl -s -o gLiveView.sh https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/gLiveView.sh
@@ -834,6 +854,10 @@ then
   # Cardano CLI binary
   sed -i "s+#CCLI=\"\${HOME}\/.cabal\/bin\/cardano-cli\"+CCLI=\"\${HOME}\/.local\/bin\/cardano-cli\"+g" env
   echo "Variables updated"
+
+  cd $CURRENT_PATH
+  echo "alias glv=\"$CURRENT_PATH/gLiveView/gLiveView.sh\"" >> .bashrc
+  echo "gLiveView available from the console using \"glv\""
 
 
   ############################################################
@@ -913,25 +937,10 @@ then
   rm service_status_raw.txt
   rm service_status.txt
 
-  
-
-
-###############################################################################################################
-# TO DO
-###############################################################################################################
-
-
-
   # Wait a few minutes and test existence of the pool
   echo "The system will wait for 5 minutes before checking the registration of the pool on the network"
   sleep 300
   cardano-cli stake-pool id --cold-verification-key-file cold.vkey --output-format "hex"
 
-
   return 0
 fi
-
-
-
-
-
