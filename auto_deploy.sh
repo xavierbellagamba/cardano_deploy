@@ -215,6 +215,14 @@ echo
 echo "DOWNLOAD THE BLOCKCHAIN"
 echo "________________________"
 
+# If existing copy pre-synched files
+if [[ -d "./presync" ]]
+then
+  mkdir -p $CURRENT_PATH/$FOLDER
+  cp -r ./presync $CURRENT_PATH/$FOLDER/db
+  rm -r ./presync
+fi
+
 # Start the node in a background process with tmux
 NODE_RUN="cardano-node run \
   --topology ~/$FOLDER/$NETWORK_LVL-topology.json \
@@ -416,6 +424,10 @@ then
 
   rm service_status_raw.txt
   rm service_status.txt
+
+  echo "Launching gLiveView in tmux"
+  tmux new -d -s gliveview
+  tmux send-keys -t gliveview "glv" Enter
 
   return 0
 
@@ -990,6 +1002,10 @@ then
   echo "The system will wait for 5 minutes before checking the registration of the pool on the network"
   sleep 300
   cardano-cli stake-pool id --cold-verification-key-file cold.vkey --output-format "hex"
+
+  echo "Launching gLiveView in tmux"
+  tmux new -d -s gliveview
+  tmux send-keys -t gliveview "glv" Enter
 
   return 0
 fi
