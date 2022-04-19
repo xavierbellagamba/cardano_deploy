@@ -63,13 +63,12 @@ CURRENT_PATH="$PWD"
 # CHECK IF METADATA READY
 ############################################################
 
-echo "________________________"
-echo
-echo "CHECK IF METADATA READY"
-echo "________________________"
-
 if [[ "$NODE" == "CORE" ]]
 then
+  echo "________________________"
+  echo
+  echo "CHECK IF METADATA READY"
+  echo "________________________"
   if [ -f pool_metadata.json ]
   then
     echo "File existing. Able to proceed. Make sure it is online before finalizing the install"
