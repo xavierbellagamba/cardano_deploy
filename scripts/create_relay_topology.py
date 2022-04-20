@@ -21,6 +21,12 @@ topology = {
     ]
 }
 
+# Reformat the entries to fit the expected format
+for node in data["Producers"]:
+    del node["continent"]
+    del node["state"]
+    node["valency"] = 1
+
 # Add random relays
 n_select = 25
 i_select = random.sample(range(len(data["Producers"])), k=n_select)
@@ -28,4 +34,4 @@ for i in i_select:
     topology["Producers"].append(data["Producers"][i])
 
 with open('topology_raw.json', 'w') as f:
-  json.dump(topology, f)
+  json.dump(topology, f, indent=2, separators=(",", ": "))

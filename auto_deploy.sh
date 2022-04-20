@@ -11,9 +11,9 @@
 NODE="RELAY" # "CORE" or "RELAY"
 
 # Pool parameters (only for core node)
-PLEDGE=25000000000
+PLEDGE=50000000000
 COST=340000000
-MARGIN=0.0225
+MARGIN=0.025
 POOL_NAME="versorium"
 POOL_TCKR="VRSM"
 POOL_DESCR="The versorium.io pool"
@@ -237,8 +237,8 @@ NODE_RUN="cardano-node run \
 tmux new -d -s vanilla_run
 tmux send-keys -t vanilla_run "$NODE_RUN" Enter
 
-echo "Node started successfully, waiting for the socket to be created (5 mins)"
-sleep 300
+echo "Node started successfully, waiting for the socket to be created (10 mins)"
+sleep 600
 
 # Make accessible and dave the node socket path in the environment variables
 echo -e "export CARDANO_NODE_SOCKET_PATH=\"~/$FOLDER/db/node.socket\"" >> ~/.bashrc
@@ -257,7 +257,7 @@ then
   echo
   echo "BLOCKCHAIN DOWNLOADING"
   echo "________________________"
-  echo "This could take a while (4-12 hours depending on network amd machine performances)"
+  echo "This could take a while (12-24 hours depending on network amd machine performances)"
 
   P=0
   while (( P < 99 ))
@@ -372,35 +372,35 @@ then
   # Generate cardano_relay_launch script
   echo "Generate the sh launch script"
 
-  echo "#!/bin/bash" >> $CURRENT_PATH/launch_script.sh
-  echo "$NODE_RUN" >> $CURRENT_PATH/launch_script.sh
+  echo "#!/usr/bin/bash" >> $CURRENT_PATH/launch_script.sh
+  echo "$HOME/.local/bin/$NODE_RUN" >> $CURRENT_PATH/launch_script.sh
 
-  chmod +x ./launch_script.sh
+  chmod +x $CURRENT_PATH/launch_script.sh
   echo "Launch script generated"
 
   # Generate the service file
   echo "Generate the systemd file"
 
-  echo "[Unit]" >> /etc/systemd/system/cardano_relay.service
-  echo "Description=Cardano relay node" >> /etc/systemd/system/cardano_relay.service
-  echo "Wants=network-online.target" >> /etc/systemd/system/cardano_relay.service
-  echo "After=network-online.target" >> /etc/systemd/system/cardano_relay.service
-  echo "" >> /etc/systemd/system/cardano_relay.service
-  echo "[Service]" >> /etc/systemd/system/cardano_relay.service
-  echo "User=$USER"
-  echo "Type=Simple" >> /etc/systemd/system/cardano_relay.service
-  echo "WorkingDirectory=$CURRENT_PATH" >> /etc/systemd/system/cardano_relay.service
-  echo "ExecStart=bash $CURRENT_PATH/launch_script.sh" >> /etc/systemd/system/cardano_relay.service
-  echo "Restart=always" >> /etc/systemd/system/cardano_relay.service
-  echo "RestartSec=5" >> /etc/systemd/system/cardano_relay.service
-  echo "KillSignal=SIGINT" >> /etc/systemd/system/cardano_relay.service
-  echo "RestartKillSignal=SIGINT" >> /etc/systemd/system/cardano_relay.service
-  echo "TimeoutStopSec=300" >> /etc/systemd/system/cardano_relay.service
-  echo "SyslogIdentifier=cardano-node" >> /etc/systemd/system/cardano_relay.service
-  echo "" >> /etc/systemd/system/cardano_relay.service
-  echo "[Install]" >> /etc/systemd/system/cardano_relay.service
-  echo "WantedBy=multi-user.target" >> /etc/systemd/system/cardano_relay.service
-  echo "" >> /etc/systemd/system/cardano_relay.service
+  sudo bash -c "echo '[Unit]' >> /etc/systemd/system/cardano_relay.service"
+  sudo bash -c "echo 'Description=Cardano relay node' >> /etc/systemd/system/cardano_relay.service"
+  sudo bash -c "echo 'Wants=network-online.target' >> /etc/systemd/system/cardano_relay.service"
+  sudo bash -c "echo 'After=network-online.target' >> /etc/systemd/system/cardano_relay.service"
+  sudo bash -c "echo '' >> /etc/systemd/system/cardano_relay.service"
+  sudo bash -c "echo '[Service]' >> /etc/systemd/system/cardano_relay.service"
+  sudo bash -c "echo 'User=$USER' >> /etc/systemd/system/cardano_relay.service"
+  sudo bash -c "echo 'Type=Simple' >> /etc/systemd/system/cardano_relay.service"
+  sudo bash -c "echo 'WorkingDirectory=$CURRENT_PATH' >> /etc/systemd/system/cardano_relay.service"
+  sudo bash -c "echo 'ExecStart=bash -c "$CURRENT_PATH/launch_script.sh"' >> /etc/systemd/system/cardano_relay.service"
+  sudo bash -c "echo 'Restart=always' >> /etc/systemd/system/cardano_relay.service"
+  sudo bash -c "echo 'RestartSec=5' >> /etc/systemd/system/cardano_relay.service"
+  sudo bash -c "echo 'KillSignal=SIGINT' >> /etc/systemd/system/cardano_relay.service"
+  sudo bash -c "echo 'RestartKillSignal=SIGINT' >> /etc/systemd/system/cardano_relay.service"
+  sudo bash -c "echo 'TimeoutStopSec=300' >> /etc/systemd/system/cardano_relay.service"
+  sudo bash -c "echo 'SyslogIdentifier=cardano-node' >> /etc/systemd/system/cardano_relay.service"
+  sudo bash -c "echo '' >> /etc/systemd/system/cardano_relay.service"
+  sudo bash -c "echo '[Install]' >> /etc/systemd/system/cardano_relay.service"
+  sudo bash -c "echo 'WantedBy=multi-user.target' >> /etc/systemd/system/cardano_relay.service"
+  sudo bash -c "echo '' >> /etc/systemd/system/cardano_relay.service"
 
   sudo chmod 644 /etc/systemd/system/cardano_relay.service
   echo "Systemd file generated"
@@ -945,35 +945,36 @@ then
   # Generate cardano_core_launch script
   echo "Generate the sh launch script"
 
-  echo "#!/bin/bash" >> $CURRENT_PATH/launch_script.sh
-  echo "$NODE_RUN" >> $CURRENT_PATH/launch_script.sh
+  echo "#!/usr/bin/bash" >> $CURRENT_PATH/launch_script.sh
+  echo "$HOME/.local/bin/$NODE_RUN" >> $CURRENT_PATH/launch_script.sh
 
-  chmod +x ./launch_script.sh
+  chmod +x $CURRENT_PATH/launch_script.sh
   echo "Launch script generated"
 
   # Generate the service file
   echo "Generate the systemd file"
 
-  echo "[Unit]" >> /etc/systemd/system/cardano_core.service
-  echo "Description=Cardano core node" >> /etc/systemd/system/cardano_core.service
-  echo "Wants=network-online.target" >> /etc/systemd/system/cardano_core.service
-  echo "After=network-online.target" >> /etc/systemd/system/cardano_core.service
-  echo "" >> /etc/systemd/system/cardano_core.service
-  echo "[Service]" >> /etc/systemd/system/cardano_core.service
-  echo "User=$USER"
-  echo "Type=Simple" >> /etc/systemd/system/cardano_core.service
-  echo "WorkingDirectory=$CURRENT_PATH" >> /etc/systemd/system/cardano_core.service
-  echo "ExecStart=bash $CURRENT_PATH/launch_script.sh" >> /etc/systemd/system/cardano_core.service
-  echo "Restart=always" >> /etc/systemd/system/cardano_core.service
-  echo "RestartSec=5" >> /etc/systemd/system/cardano_core.service
-  echo "KillSignal=SIGINT" >> /etc/systemd/system/cardano_core.service
-  echo "RestartKillSignal=SIGINT" >> /etc/systemd/system/cardano_core.service
-  echo "TimeoutStopSec=300" >> /etc/systemd/system/cardano_core.service
-  echo "SyslogIdentifier=cardano-node" >> /etc/systemd/system/cardano_core.service
-  echo "" >> /etc/systemd/system/cardano_core.service
-  echo "[Install]" >> /etc/systemd/system/cardano_core.service
-  echo "WantedBy=multi-user.target" >> /etc/systemd/system/cardano_core.service
-  echo "" >> /etc/systemd/system/cardano_core.service
+  sudo bash -c "echo '[Unit]' >> /etc/systemd/system/cardano_core.service"
+  sudo bash -c "echo 'Description=Cardano core node' >> /etc/systemd/system/cardano_core.service"
+  sudo bash -c "echo 'Wants=network-online.target' >> /etc/systemd/system/cardano_core.service"
+  sudo bash -c "echo 'After=network-online.target' >> /etc/systemd/system/cardano_core.service"
+  sudo bash -c "echo '' >> /etc/systemd/system/cardano_core.service"
+  sudo bash -c "echo '[Service]' >> /etc/systemd/system/cardano_core.service"
+  sudo bash -c "echo 'User=$USER' >> /etc/systemd/system/cardano_core.service"
+  sudo bash -c "echo 'Type=Simple' >> /etc/systemd/system/cardano_core.service"
+  sudo bash -c "echo 'WorkingDirectory=$CURRENT_PATH' >> /etc/systemd/system/cardano_core.service"
+  sudo bash -c "echo 'ExecStart=bash $CURRENT_PATH/launch_script.sh' >> /etc/systemd/system/cardano_core.service"
+  sudo bash -c "echo 'Restart=always' >> /etc/systemd/system/cardano_core.service"
+  sudo bash -c "echo 'RestartSec=5' >> /etc/systemd/system/cardano_core.service"
+  sudo bash -c "echo 'RemainAfterExit=true' >> /etc/systemd/system/cardano_relay.service"
+  sudo bash -c "echo 'KillSignal=SIGINT' >> /etc/systemd/system/cardano_core.service"
+  sudo bash -c "echo 'RestartKillSignal=SIGINT' >> /etc/systemd/system/cardano_core.service"
+  sudo bash -c "echo 'TimeoutStopSec=300' >> /etc/systemd/system/cardano_core.service"
+  sudo bash -c "echo 'SyslogIdentifier=cardano-node' >> /etc/systemd/system/cardano_core.service"
+  sudo bash -c "echo '' >> /etc/systemd/system/cardano_core.service"
+  sudo bash -c "echo '[Install]' >> /etc/systemd/system/cardano_core.service"
+  sudo bash -c "echo 'WantedBy=multi-user.target' >> /etc/systemd/system/cardano_core.service"
+  sudo bash -c "echo '' >> /etc/systemd/system/cardano_core.service"
 
   sudo chmod 644 /etc/systemd/system/cardano_core.service
   echo "Systemd file generated"
@@ -1001,8 +1002,8 @@ then
   rm service_status.txt
 
   # Wait a few minutes and test existence of the pool
-  echo "The system will wait for 5 minutes before checking the registration of the pool on the network"
-  sleep 300
+  echo "The system will wait for 15 minutes before checking the registration of the pool on the network"
+  sleep 900
   cardano-cli stake-pool id --cold-verification-key-file cold.vkey --output-format "hex"
 
   echo "Launching gLiveView in tmux"

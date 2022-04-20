@@ -38,9 +38,9 @@ On AWS, this configuration is best represented by the m4.xlarge EC2 machines.
 
 ## How to use the deployment scripts
 The successful deployment of a Cardano stake pool using this approach can be decomposed into 5 steps:
-1. Run the script on the relay infrastructure with `-i` flag (should complete without intervention)
+1. Run the script on the relay infrastructure with the `-i` flag (should complete without intervention)
 2. Check relay deployment by checking the gLiveView (cmd: <code>glv</code>)
-3. Run the script on the core node infrastructure `-i` flag (make sure the prerequisits are setup)
+3. Run the script on the core node infrastructure with the `-i` flag (make sure the prerequisits are setup)
 4. Once signalled by the program, send the funds necessary for the registration
 5. Check the core node deployment by checking the gLiveView and [pooltool.io](https://pooltool.io/)
 

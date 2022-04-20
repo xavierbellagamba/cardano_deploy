@@ -36,4 +36,4 @@ if path.exists('relay_dns_2.txt'):
     }
 
 with open('topology_raw.json', 'w') as f:
-  json.dump(topology, f)
+  json.dump(topology, f, indent=2, separators=(",", ": "))
