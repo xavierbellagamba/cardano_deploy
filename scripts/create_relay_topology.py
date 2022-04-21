@@ -4,19 +4,27 @@ import random
 with open('topology.json', 'r') as f:
     data = json.load(f)
 
+with open('./relay/mainnet-topology.json', 'r') as f:
+    ref_prod = json.load(f)
+
 with open('core_dns.txt', 'r') as f:
     ip = f.read()
 
 with open('core_port.txt', 'r') as f:
     port = f.read()
     
-# Add producing block
+# Add producing block and iohk node
 topology = {
     "Producers": [
         {
             "addr": str(ip).split("\n")[0],
             "port": int(port),
             "valency": 1
+        },
+        {
+            "addr": ref_prod["Producers"][0]["addr"],
+            "port": int(ref_prod["Producers"][0]["port"]),
+            "valency": int(ref_prod["Producers"][0]["valency"])
         }
     ]
 }

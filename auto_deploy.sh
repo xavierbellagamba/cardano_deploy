@@ -221,8 +221,7 @@ echo "________________________"
 if [[ -d "./presync" ]]
 then
   mkdir -p $CURRENT_PATH/$FOLDER
-  cp -r ./presync $CURRENT_PATH/$FOLDER/db
-  rm -r ./presync
+  mv ./presync $CURRENT_PATH/$FOLDER/db
 fi
 
 # Start the node in a background process with tmux
@@ -237,8 +236,8 @@ NODE_RUN="cardano-node run \
 tmux new -d -s vanilla_run
 tmux send-keys -t vanilla_run "$NODE_RUN" Enter
 
-echo "Node started successfully, waiting for the socket to be created (10 mins)"
-sleep 600
+echo "Node started successfully, waiting for the socket to be created (45 mins)"
+sleep 2700
 
 # Make accessible and dave the node socket path in the environment variables
 echo -e "export CARDANO_NODE_SOCKET_PATH=\"~/$FOLDER/db/node.socket\"" >> ~/.bashrc
@@ -260,7 +259,7 @@ then
   echo "This could take a while (12-24 hours depending on network amd machine performances)"
 
   P=0
-  while (( P < 99 ))
+  while (( P < 100 ))
   do
     sleep 900
     cardano-cli query tip --$NETWORK_NAME >> curr_tip.json
@@ -448,7 +447,7 @@ then
   echo "While the blockchain is loading, request funds from the Faucet for testnet or transfer ADA for mainnet"
 
   P=0
-  while (( P < 99 ))
+  while (( P < 100 ))
   do
     sleep 900
     cardano-cli query tip --$NETWORK_NAME >> curr_tip.json
