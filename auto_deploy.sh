@@ -463,11 +463,11 @@ then
   # Wait 5h for the relay to register
   sleep 18000
 
-  # Write the topogyPuller
+  # Write the topologyPuller
   echo -e "#!/bin/bash" >> $CURRENT_PATH/topologyPuller.sh
   echo -e "BLOCKPRODUCING_IP=$CORE_DNS" >> $CURRENT_PATH/topologyPuller.sh
   echo -e "BLOCKPRODUCING_PORT=$CORE_PORT" >> $CURRENT_PATH/topologyPuller.sh
-  echo -e "curl -s -o $NODE_HOME/$NETWORK_LVL-topology.json \"https://api.clio.one/htopology/v1/fetch/?max=25&customPeers=\${BLOCKPRODUCING_IP}:\${BLOCKPRODUCING_PORT}:1|relays-new.cardano-mainnet.iohk.io:3001:2\"" >> $CURRENT_PATH/topologyPuller.sh
+  echo -e "curl -s -o $CURRENT_PATH/$NETWORK_LVL-topology.json \"https://api.clio.one/htopology/v1/fetch/?max=25&customPeers=\${BLOCKPRODUCING_IP}:\${BLOCKPRODUCING_PORT}:1|relays-new.cardano-mainnet.iohk.io:3001:2\"" >> $CURRENT_PATH/topologyPuller.sh
 
   # Execute the topologyPuller
   chmod +x $CURRENT_PATH/topologyPuller.sh
