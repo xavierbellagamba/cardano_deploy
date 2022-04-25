@@ -224,6 +224,11 @@ then
   mv ./presync $CURRENT_PATH/$FOLDER/db
 fi
 
+# Make accessible and dave the node socket path in the environment variables
+echo -e "export CARDANO_NODE_SOCKET_PATH=\"$HOME/$FOLDER/db/node.socket\"" >> ~/.bashrc
+chmod 777 $HOME/$FOLDER/db/node.socket
+source $HOME/.bashrc
+
 # Start the node in a background process with tmux
 NODE_RUN="cardano-node run \
   --topology ~/$FOLDER/$NETWORK_LVL-topology.json \
@@ -237,13 +242,7 @@ tmux new -d -s vanilla_run
 tmux send-keys -t vanilla_run "$NODE_RUN" Enter
 
 echo "Node started successfully, waiting for the socket to be created (45 mins)"
-sleep 2700
-
-# Make accessible and dave the node socket path in the environment variables
-echo -e "export CARDANO_NODE_SOCKET_PATH=\"~/$FOLDER/db/node.socket\"" >> ~/.bashrc
-source ~/.bashrc
-chmod 777 ~/$FOLDER/db/node.socket
-
+sleep 7200
 
 ###########################################################
 # THIS IS WHERE RELAY AND CORE ARE DIFFERENTIATED
@@ -347,6 +346,7 @@ then
   cd $CURRENT_PATH
   echo "alias glv=\"$CURRENT_PATH/gLiveView/gLiveView.sh\"" >> .bashrc
   echo "gLiveView available from the console using \"glv\""
+  source ~/.bashrc
 
 
   ############################################################
@@ -365,13 +365,14 @@ then
   # Create the service in systemd
   if [ -f /etc/systemd/system/cardano_relay.service ]
   then
-    rm /etc/systemd/system/cardano_relay.service
+    sudo rm /etc/systemd/system/cardano_relay.service
   fi
 
   # Generate cardano_relay_launch script
   echo "Generate the sh launch script"
 
   echo "#!/usr/bin/bash" >> $CURRENT_PATH/launch_script.sh
+  echo "" >> $CURRENT_PATH/launch_script.sh
   echo "$HOME/.local/bin/$NODE_RUN" >> $CURRENT_PATH/launch_script.sh
 
   chmod +x $CURRENT_PATH/launch_script.sh
@@ -426,9 +427,54 @@ then
   rm service_status_raw.txt
   rm service_status.txt
 
-  echo "Launching gLiveView in tmux"
+  echo "Launching gLiveView in tmux in 90 minutes"
+  sleep 5400
   tmux new -d -s gliveview
   tmux send-keys -t gliveview "glv" Enter
+
+
+  ############################################################
+  # CRONJOB TO REGISTER THE RELAY
+  ############################################################
+  
+  echo "________________________"
+  echo
+  echo "CRONJOB TO REGISTER"
+  echo "________________________"
+
+  # Create the topologyUpdater
+  echo -e "#!/bin/bash" >> $CURRENT_PATH/topologyUpdater.sh
+  echo -e "CNODE_LOG_DIR=\"$CURRENT_PATH/relay/logs\"" >> $CURRENT_PATH/topologyUpdater.sh
+  echo -e "CNODE_PORT=6000" >> $CURRENT_PATH/topologyUpdater.sh
+  echo -e "GENESIS_JSON=\"$CURRENT_PATH/relay/mainnet-shelley-genesis.json\"" >> $CURRENT_PATH/topologyUpdater.sh
+  echo -e "export CARDANO_NODE_SOCKET_PATH=\"$CURRENT_PATH/relay/db/node.socket\"" >> $CURRENT_PATH/topologyUpdater.sh
+  echo -e "export PATH=\"$CURRENT_PATH/.local/bin:${PATH}\"" >> $CURRENT_PATH/topologyUpdater.sh
+  echo -e "NWMAGIC=\$(jq -r .networkMagic < \$GENESIS_JSON)" >> $CURRENT_PATH/topologyUpdater.sh
+  echo -e "blockNo=\$( $CURRENT_PATH/.local/bin/cardano-cli query tip --mainnet | jq -r .block )" >> $CURRENT_PATH/topologyUpdater.sh
+  echo -e "curl -s -f -4 \"https://api.clio.one/htopology/v1/?port=\${CNODE_PORT}&blockNo=\${blockNo}&valency=1&magic=\${NWMAGIC}\" | sudo tee -a $CURRENT_PATH/relay/logs/topologyUpdater_lastresult.json" >> $CURRENT_PATH/topologyUpdater.sh
+  echo -e "" >> $CURRENT_PATH/topologyUpdater.sh
+  chmod +x topologyUpdater.sh
+
+  # Add its execution to crontab
+  echo -e "16 * * * * $CURRENT_PATH/topologyUpdater.sh" >> $CURRENT_PATH/crontab-fragment.txt
+  crontab -l | cat - $CURRENT_PATH/crontab-fragment.txt > $CURRENT_PATH/crontab.txt && crontab $CURRENT_PATH/crontab.txt
+  rm $CURRENT_PATH/crontab-fragment.txt
+
+  # Wait 5h for the relay to register
+  sleep 18000
+
+  # Write the topogyPuller
+  echo -e "#!/bin/bash" >> $CURRENT_PATH/topologyPuller.sh
+  echo -e "BLOCKPRODUCING_IP=$CORE_DNS" >> $CURRENT_PATH/topologyPuller.sh
+  echo -e "BLOCKPRODUCING_PORT=$CORE_PORT" >> $CURRENT_PATH/topologyPuller.sh
+  echo -e "curl -s -o $NODE_HOME/$NETWORK_LVL-topology.json \"https://api.clio.one/htopology/v1/fetch/?max=25&customPeers=\${BLOCKPRODUCING_IP}:\${BLOCKPRODUCING_PORT}:1|relays-new.cardano-mainnet.iohk.io:3001:2\"" >> $CURRENT_PATH/topologyPuller.sh
+
+  # Execute the topologyPuller
+  chmod +x $CURRENT_PATH/topologyPuller.sh
+  bash $CURRENT_PATH/topologyPuller.sh
+
+  # Restart the node
+  sudo systemctl restart cardano_relay
 
   return 0
 
@@ -560,7 +606,7 @@ then
   cardano-cli query tip --$NETWORK_NAME >> curr_tip.json
   python3 $CURRENT_PATH/scripts/get_curr_slot.py
   SLOT=$( cat curr_slot.txt )
-  SLOT =$( expr $SLOT + 2000 )
+  ((SLOT = SLOT + 2000 ))
   rm curr_tip.json
   rm curr_slot.txt
 
@@ -600,7 +646,7 @@ then
   rm fee.txt
 
   # Calculate final balance
-  FIN_BAL=$( expr $BAL - $FEE - $STK_DPST )
+  (( FIN_BAL= BAL - FEE - STK_DPST ))
 
   # Build final transaction
   echo "Build, sign and submit the registration transaction"
@@ -685,7 +731,7 @@ then
   rm curr_slot.txt
 
   # Current kes epoch
-  KES_EP=$( expr $SLOT / $KES_P )
+  (( KES_EP= SLOT / KES_P ))
 
   # Generate operational certificate
   cd ~/keysnaddresses
@@ -693,7 +739,7 @@ then
     --kes-verification-key-file kes.vkey \
     --cold-signing-key-file cold.skey \
     --operational-certificate-issue-counter cold.counter \
-    --kes-period KES_EP \ 
+    --kes-period $KES_EP \
     --out-file node.cert
   echo "Operational certificate generated"
 
@@ -773,13 +819,13 @@ then
 
   # Build the raw transaction
   cardano-cli transaction build-raw \
-    --tx-in \
+    --tx-in $UTXOIX\
     --tx-out $(cat payment.addr)+0 \
     --invalid-hereafter 0 \
     --fee 0 \
-    --out-file tx.draft \
     --certificate-file pool-registration.cert \
-    --certificate-file delegation.cert
+    --certificate-file delegation.cert \
+    --out-file tx.draft
 
   # Get the pool deposit from protocol.json
   cardano-cli query protocol-parameters \
@@ -803,20 +849,27 @@ then
   rm fee_raw.txt
   rm fee.txt
 
+  # Get current slot
+  cardano-cli query tip --$NETWORK_NAME >> curr_tip.json
+  python3 $CURRENT_PATH/scripts/get_curr_slot.py
+  SLOT=$( cat curr_slot.txt )
+  rm curr_tip.json
+  rm curr_slot.txt
+
   # Calculate final balance and TTL
-  SLOT=$( $SLOT + 3000 )
-  FIN_BAL=$( expr BAL - POOL_DPST -  )
+  (( SLOT= SLOT + 3000 ))
+  (( FIN_BAL= BAL - POOL_DPST - FEE ))
 
   # Build final transaction
   echo "Build, sign and submit the registration transaction"
   cardano-cli transaction build-raw \
     --tx-in $UTXOIX \
-    --tx-out $(cat payment.addr)+FIN_BAL \
+    --tx-out $(cat payment.addr)+$FIN_BAL \
     --invalid-hereafter $SLOT \
     --fee $FEE \
-    --out-file tx.raw \
     --certificate-file pool-registration.cert \
-    --certificate-file delegation.cert
+    --certificate-file delegation.cert \
+    --out-file tx.raw
 
   # Sign transaction
   cardano-cli transaction sign \
@@ -917,9 +970,10 @@ then
   sed -i "s+#CCLI=\"\${HOME}\/.cabal\/bin\/cardano-cli\"+CCLI=\"\${HOME}\/.local\/bin\/cardano-cli\"+g" env
   echo "Variables updated"
 
-  cd $CURRENT_PATH
+  cd
   echo "alias glv=\"$CURRENT_PATH/gLiveView/gLiveView.sh\"" >> .bashrc
   echo "gLiveView available from the console using \"glv\""
+  source ~/.bashrc
 
 
   ############################################################
@@ -938,13 +992,26 @@ then
   # Create the service in systemd
   if [ -f /etc/systemd/system/cardano_core.service ]
   then
-    rm /etc/systemd/system/cardano_core.service
+    sudo rm /etc/systemd/system/cardano_core.service
   fi
+
+  # Node run as a core node
+  NODE_RUN="cardano-node run \
+    --topology ~/$FOLDER/$NETWORK_LVL-topology.json \
+    --database-path ~/$FOLDER/db \
+    --socket-path ~/$FOLDER/db/node.socket \
+    --host-addr $IP_ADDR \
+    --port $PORT \
+    --config ~/$FOLDER/$NETWORK_LVL-config.json \
+    --shelley-kes-key ~/keysnaddresses/kes.skey \
+    --shelley-vrf-key ~/keysnaddresses/vrf.skey \
+    --shelley-operational-certificate ~/keysnaddresses/node.cert"
 
   # Generate cardano_core_launch script
   echo "Generate the sh launch script"
 
   echo "#!/usr/bin/bash" >> $CURRENT_PATH/launch_script.sh
+  echo "" >> $CURRENT_PATH/launch_script.sh
   echo "$HOME/.local/bin/$NODE_RUN" >> $CURRENT_PATH/launch_script.sh
 
   chmod +x $CURRENT_PATH/launch_script.sh
@@ -965,7 +1032,7 @@ then
   sudo bash -c "echo 'ExecStart=bash $CURRENT_PATH/launch_script.sh' >> /etc/systemd/system/cardano_core.service"
   sudo bash -c "echo 'Restart=always' >> /etc/systemd/system/cardano_core.service"
   sudo bash -c "echo 'RestartSec=5' >> /etc/systemd/system/cardano_core.service"
-  sudo bash -c "echo 'RemainAfterExit=true' >> /etc/systemd/system/cardano_relay.service"
+  sudo bash -c "echo 'RemainAfterExit=true' >> /etc/systemd/system/cardano_core.service"
   sudo bash -c "echo 'KillSignal=SIGINT' >> /etc/systemd/system/cardano_core.service"
   sudo bash -c "echo 'RestartKillSignal=SIGINT' >> /etc/systemd/system/cardano_core.service"
   sudo bash -c "echo 'TimeoutStopSec=300' >> /etc/systemd/system/cardano_core.service"
@@ -1001,11 +1068,13 @@ then
   rm service_status.txt
 
   # Wait a few minutes and test existence of the pool
-  echo "The system will wait for 15 minutes before checking the registration of the pool on the network"
-  sleep 900
-  cardano-cli stake-pool id --cold-verification-key-file cold.vkey --output-format "hex"
+  echo "The system will wait for 120 minutes before checking the registration of the pool on the network"
+  sleep 7200
+  cardano-cli stake-pool id --cold-verification-key-file cold.vkey --output-format "hex" >> stakepoolid.txt
+  cardano-cli query stake-snapshot --stake-pool-id $(cat stakepoolid.txt) --mainnet 
 
-  echo "Launching gLiveView in tmux"
+  echo "Launching gLiveView in tmux in 30 minutes"
+  sleep 1800
   tmux new -d -s gliveview
   tmux send-keys -t gliveview "glv" Enter
 

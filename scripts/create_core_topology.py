@@ -29,11 +29,11 @@ if path.exists('relay_dns_2.txt'):
     with open('relay_port_2.txt', 'r') as f:
         port_2 = f.read()
 
-    topology["Producers"] += {
+    topology["Producers"].append({
         "addr": str(ip_2).split("\n")[0],
         "port": int(port_2),
-        "valency": 1
-    }
+        "valency": 1}
+    )
 
 with open('topology_raw.json', 'w') as f:
   json.dump(topology, f, indent=2, separators=(",", ": "))
