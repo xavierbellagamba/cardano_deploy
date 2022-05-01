@@ -10,9 +10,13 @@
 - Enable communication only with the relay nodes
 - When connection is required, connect with SSH
 - SSH key must be stored on a cold storage
+- Only the three following files should be on the machine:
+    - kes.skey
+    - node.cert
+    - vrf.skey
 
 ## Staking pool security (keys)
-- Cold keys must be stored on a cold storage
+- All other keys, addresses and certificates must be stored on a cold storage
 - Cold keys must always be remove from connected infra
 
 ## Cold storage
